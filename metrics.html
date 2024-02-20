@@ -1,74 +1,195 @@
 <!DOCTYPE html>
-<html>
-
+<html lang="en">
 <head>
-  <meta charset="utf-8">
-  <title>Untitled Document</title>
-  <style>
-    body {
-      font-family: Arial, sans-serif;
-      background-color: #f8f8f8;
-      margin: 0;
-      padding: 0;
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Slideshow</title>
+<style>
+    body, html {
+        height: 100%;
+        margin: 0;
+        padding: 0;
     }
-
-    h1 {
-      text-align: center;
-      margin-top: 20px;
-      color: #333;
+    .slide {
+        display: none;
+        text-align: center;
+        height: 100%;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+        background-color: #f0f1ef;
+        color: #262524;
     }
-
-    table {
-      width: 100%;
-      border-collapse: collapse;
-      background-color: #fff;
-      box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+    .slide h2, .slide p {
+        margin: 0;
     }
-
-    td {
-      text-align: center;
-      font-weight: bold;
-      padding: 15px;
-      border: 1px solid #ccc;
-      font-size: 18px;
+    #slide1 { background-color: #005431; color: #f0f1ef; }
+    #slide2 { background-color: #95bc76; color: #262524; }
+    #slide3 { background-color: #f0f1ef; color: #262524; }
+    #slide4 { background-color: #262524; color: #f0f1ef; }
+    #slide5 { background-color: #a09c9b; color: #262524; }
+    #slide6 { background-color: #f0f1ef; color: #262524; }
+    #slide7 { background-color: #95bc76; color: #262524; }
+    #slide8 { background-color: #005431; color: #f0f1ef; }
+    #slide8 table {
+        width: 90%;
+        border-collapse: collapse;
+        margin-top: 20px;
     }
-
-    td p:last-child {
-      font-size: 50px; /* Adjust the font size for the last paragraph (numbers) */
+    #slide8 th, #slide8 td {
+        border: 1px solid #262524;
+        padding: 8px;
     }
-
-    tr:nth-child(odd) {
-      background-color: #ddf2d8; /* Light pastel green */
-    }
-
-    tr:nth-child(even) {
-      background-color: #aedc91; /* Medium pastel green */
-    }
-
-  </style>
+</style>
 </head>
-
 <body>
-  <h1>Signals</h1>
-  <table>
-    <tbody>
-      <tr>
-        <td><p>Baptisms</p><p>100</p></td>
-        <td><p>Discover White Oak (C/R)</p><p>70/70</p></td>
-        <td><p>Groups</p><p>300</p></td>
-      </tr>
-      <tr>
-        <td><p>Missions</p><p>80</p></td>
-        <td><p>The ONE</p><p>100%</p></td>
-        <td><p>Serving Rate</p><p>50%</p></td>
-      </tr>
-    </tbody>
-    <tbody>
-      <tr>
-        <td colspan="3"><p>Christmas/Easter</p><p>2200</p></td>
-      </tr>
-    </tbody>
-  </table>
-</body>
 
+<div class="slide" id="slide1">
+    <h2>Baptisms</h2>
+    <p>100/100</p>
+</div>
+
+<div class="slide" id="slide2">
+    <h2>Discover White Oak (C/R)</h2>
+    <p>70/70 70/70</p>
+</div>
+
+<div class="slide" id="slide3">
+    <h2>Groups</h2>
+    <p>300/300</p>
+</div>
+
+<div class="slide" id="slide4">
+    <h2>Missions</h2>
+    <p>80/80</p>
+</div>
+
+<div class="slide" id="slide5">
+    <h2>The ONE</h2>
+    <p>100%</p>
+</div>
+
+<div class="slide" id="slide6">
+    <h2>Serving Rate</h2>
+    <p>50%</p>
+</div>
+
+<div class="slide" id="slide7">
+    <h2>Christmas/Easter</h2>
+    <p>2200/2200</p>
+</div>
+
+<div class="slide" id="slide8">
+    <h2>All Data</h2>
+    <table>
+        <tr>
+            <th>Data</th>
+            <th>Value</th>
+        </tr>
+        <tr>
+            <td>Baptisms</td>
+            <td>100/100</td>
+        </tr>
+        <tr>
+            <td>Discover White Oak (C/R)</td>
+            <td>70/70 70/70</td>
+        </tr>
+        <tr>
+            <td>Groups</td>
+            <td>300/300</td>
+        </tr>
+        <tr>
+            <td>Missions</td>
+            <td>80/80</td>
+        </tr>
+        <tr>
+            <td>The ONE</td>
+            <td>100%</td>
+        </tr>
+        <tr>
+            <td>Serving Rate</td>
+            <td>50%</td>
+        </tr>
+        <tr>
+            <td>Easter</td>
+            <td>/2200</td>
+        </tr>
+    </table>
+</div>
+
+<script>
+    var slides = document.querySelectorAll('.slide');
+    var currentSlide = 0;
+
+    function adjustFontSize() {
+        var slide = slides[currentSlide];
+        var maxHeight = window.innerHeight * 0.7; // Set max height to 70% of window height
+        var maxWidth = window.innerWidth * 0.9; // Set max width to 90% of window width
+        var fontSize = Math.min(slide.offsetWidth / 10, slide.offsetHeight / 5, maxHeight / 5, maxWidth / 25);
+        slide.style.fontSize = fontSize + 'px';
+    }
+
+    function showSlide(n) {
+        slides[currentSlide].style.display = 'none';
+        currentSlide = (n + slides.length) % slides.length;
+        slides[currentSlide].style.display = 'flex';
+        adjustFontSize();
+    }
+
+    function nextSlide() {
+        showSlide(currentSlide + 1);
+    }
+
+    function prevSlide() {
+        showSlide(currentSlide - 1);
+    }
+
+    function startSlideshow() {
+        showSlide(0);
+        setInterval(nextSlide, 10000); // Change slide every 10 seconds
+        adjustFontSize(); // Adjust font size initially
+    }
+
+    startSlideshow();
+    window.addEventListener('resize', adjustFontSize); // Adjust font size on window resize
+
+    // Keyboard navigation
+    document.addEventListener('keydown', function(event) {
+        if (event.keyCode === 37) {
+            prevSlide(); // Left arrow key
+        } else if (event.keyCode === 39) {
+            nextSlide(); // Right arrow key
+        }
+    });
+
+    // Swipe navigation
+    var touchStartX = 0;
+    var touchEndX = 0;
+
+    document.addEventListener('touchstart', function(event) {
+        touchStartX = event.touches[0].clientX;
+    });
+
+    document.addEventListener('touchend', function(event) {
+        touchEndX = event.changedTouches[0].clientX;
+        handleSwipe();
+    });
+
+    function handleSwipe() {
+        if (touchEndX < touchStartX) {
+            nextSlide(); // Swiped left
+        } else if (touchEndX > touchStartX) {
+            prevSlide(); // Swiped right
+        }
+    }
+    function reloadPage() {
+        location.reload(); // Reload the page
+    }
+
+    // Reload the page every hour (3600000 milliseconds = 1 hour)
+    setTimeout(reloadPage, 3600000);
+</script>
+
+</body>
 </html>
