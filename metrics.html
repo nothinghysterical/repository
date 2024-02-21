@@ -125,7 +125,7 @@
 
     function adjustFontSize() {
         var slide = slides[currentSlide];
-        var maxHeight = window.innerHeight * 0.7; // Set max height to 70% of window height
+        var maxHeight = window.innerHeight * 0.9; // Set max height to 70% of window height
         var maxWidth = window.innerWidth * 0.9; // Set max width to 90% of window width
         var fontSize = Math.min(slide.offsetWidth / 10, slide.offsetHeight / 5, maxHeight / 5, maxWidth / 25);
         slide.style.fontSize = fontSize + 'px';
