@@ -4,193 +4,31 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="apple-mobile-web-app-capable" content="yes">
-<title>Slideshow</title>
+<title>Full Screen GIF</title>
 <style>
-    body, html {
-        height: 100%;
-        margin: 0;
-        padding: 0;
-    }
-    .slide {
-        display: none;
-        text-align: center;
-        height: 100%;
-        display: flex;
-        flex-direction: column;
-        justify-content: center;
-        align-items: center;
-        background-color: #f0f1ef;
-        color: #262524;
-    }
-    .slide h2, .slide p {
-        margin: 0;
-    }
-    #slide1 { background-color: #005431; color: #f0f1ef; }
-    #slide2 { background-color: #95bc76; color: #262524; }
-    #slide3 { background-color: #f0f1ef; color: #262524; }
-    #slide4 { background-color: #262524; color: #f0f1ef; }
-    #slide5 { background-color: #a09c9b; color: #262524; }
-    #slide6 { background-color: #f0f1ef; color: #262524; }
-    #slide7 { background-color: #95bc76; color: #262524; }
-    #slide8 { background-color: #005431; color: #f0f1ef; }
-    #slide8 table {
-        width: 90%;
-        border-collapse: collapse;
-        margin-top: 20px;
-    }
-    #slide8 th, #slide8 td {
-        border: 1px solid #262524;
-        padding: 8px;
-    }
+  /* Apply CSS to make the GIF cover the entire screen */
+  body, html {
+    margin: 0;
+    padding: 0;
+    height: 100%;
+    overflow: hidden;
+  }
+  
+  .fullscreen-gif {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    z-index: -1;
+  }
 </style>
+<meta http-equiv="refresh" content="300"> <!-- Refresh every 300 seconds (5 minutes) -->
 </head>
 <body>
-
-<div class="slide" id="slide1">
-    <h2>Baptisms</h2>
-    <p>5/100</p>
-</div>
-
-<div class="slide" id="slide2">
-    <h2>Discover White Oak (C/R)</h2>
-    <p>0/70 0/70</p>
-</div>
-
-<div class="slide" id="slide3">
-    <h2>Groups</h2>
-    <p>224/300</p>
-</div>
-
-<div class="slide" id="slide4">
-    <h2>Missions</h2>
-    <p>11/80</p>
-</div>
-
-<div class="slide" id="slide5">
-    <h2>The ONE</h2>
-    <p>0%</p>
-</div>
-
-<div class="slide" id="slide6">
-    <h2>Serving Rate</h2>
-    <p>44%</p>
-</div>
-
-<div class="slide" id="slide7">
-    <h2>Christmas/Easter</h2>
-    <p>1935/2200</p>
-</div>
-
-<div class="slide" id="slide8">
-    <h2>All Measurables</h2>
-    <table>
-        <tr>
-            <th>Data</th>
-            <th>Value</th>
-        </tr>
-        <tr>
-            <td>Baptisms</td>
-            <td>5/100</td>
-        </tr>
-        <tr>
-            <td>Discover White Oak (C/R)</td>
-            <td>0/70 0/70</td>
-        </tr>
-        <tr>
-            <td>Groups</td>
-            <td>224/300</td>
-        </tr>
-        <tr>
-            <td>Missions</td>
-            <td>11/80</td>
-        </tr>
-        <tr>
-            <td>The ONE</td>
-            <td>0%</td>
-        </tr>
-        <tr>
-            <td>Serving Rate</td>
-            <td>44%</td>
-        </tr>
-        <tr>
-            <td>Easter</td>
-            <td>1935/2200</td>
-        </tr>
-    </table>
-</div>
-
-<script>
-    var slides = document.querySelectorAll('.slide');
-    var currentSlide = 0;
-
-    function adjustFontSize() {
-        var slide = slides[currentSlide];
-        var maxHeight = window.innerHeight * 0.9; // Set max height to 70% of window height
-        var maxWidth = window.innerWidth * 0.9; // Set max width to 90% of window width
-        var fontSize = Math.min(slide.offsetWidth / 10, slide.offsetHeight / 5, maxHeight / 5, maxWidth / 25);
-        slide.style.fontSize = fontSize + 'px';
-    }
-
-    function showSlide(n) {
-        slides[currentSlide].style.display = 'none';
-        currentSlide = (n + slides.length) % slides.length;
-        slides[currentSlide].style.display = 'flex';
-        adjustFontSize();
-    }
-
-    function nextSlide() {
-        showSlide(currentSlide + 1);
-    }
-
-    function prevSlide() {
-        showSlide(currentSlide - 1);
-    }
-
-    function startSlideshow() {
-        showSlide(0);
-        setInterval(nextSlide, 10000); // Change slide every 10 seconds
-        adjustFontSize(); // Adjust font size initially
-    }
-
-    startSlideshow();
-    window.addEventListener('resize', adjustFontSize); // Adjust font size on window resize
-
-    // Keyboard navigation
-    document.addEventListener('keydown', function(event) {
-        if (event.keyCode === 37) {
-            prevSlide(); // Left arrow key
-        } else if (event.keyCode === 39) {
-            nextSlide(); // Right arrow key
-        }
-    });
-
-    // Swipe navigation
-    var touchStartX = 0;
-    var touchEndX = 0;
-
-    document.addEventListener('touchstart', function(event) {
-        touchStartX = event.touches[0].clientX;
-    });
-
-    document.addEventListener('touchend', function(event) {
-        touchEndX = event.changedTouches[0].clientX;
-        handleSwipe();
-    });
-
-    function handleSwipe() {
-        if (touchEndX < touchStartX) {
-            nextSlide(); // Swiped left
-        } else if (touchEndX > touchStartX) {
-            prevSlide(); // Swiped right
-        }
-    }
-    function reloadPage() {
-        location.reload(); // Reload the page
-    }
-
-    // Reload the page every hour (3600000 milliseconds = 1 hour)
-    setTimeout(reloadPage, 3600000);
-</script>
-
+  <!-- Replace "URL_TO_YOUR_GIF" with the actual URL of your GIF -->
+  <img src="URL_TO_YOUR_GIF" class="fullscreen-gif" alt="Full Screen GIF">
 </body>
 </html>
+
