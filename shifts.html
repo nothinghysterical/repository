@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Room Cleaning Shifts</title>
+  <title>Room Cleaning Shifts with Priority Demotion</title>
   <style>
     body {
       font-family: Arial, sans-serif;
@@ -32,26 +32,71 @@
   <div id="shift-container"></div>
 
   <script>
+    const apiKey = '5b9a10e2092947d49dac84004ad149a2';
+    const formId = '250955404825056';
+    const roomFieldId = '18';
+
+    // Helper: get current week Monday and Sunday
+    function getWeekBounds() {
+      const now = new Date();
+      const day = now.getDay();
+      const diffToMonday = (day === 0) ? -6 : 1 - day;
+      const monday = new Date(now);
+      monday.setHours(0, 0, 0, 0);
+      monday.setDate(now.getDate() + diffToMonday);
+
+      const sunday = new Date(monday);
+      sunday.setDate(monday.getDate() + 6);
+      sunday.setHours(23, 59, 59, 999);
+
+      return { monday, sunday };
+    }
+
     async function loadAndAssignShifts() {
-      const response = await fetch('rooms-shifts.csv');
+      // Fetch completed submissions
+      const { monday, sunday } = getWeekBounds();
+      const startISO = monday.toISOString();
+      const endISO = sunday.toISOString();
+
+      // Fetch submissions from JotForm API for this week
+      let submissions = [];
+      try {
+        const res = await fetch(`https://api.jotform.com/form/${formId}/submissions?apiKey=${apiKey}&filter[created_at][from]=${startISO}&filter[created_at][to]=${endISO}&limit=1000`);
+        const data = await res.json();
+        submissions = data.content || [];
+      } catch(e) {
+        console.error('Error fetching JotForm submissions', e);
+      }
+
+      // Extract completed rooms from submissions
+      const completedRoomsSet = new Set();
+      submissions.forEach(sub => {
+        const roomName = sub.answers?.[roomFieldId]?.answer?.trim();
+        if (roomName) completedRoomsSet.add(roomName);
+      });
+
+      // Fetch rooms.csv
+      const response = await fetch('rooms.csv');
       const csvText = await response.text();
 
-      // Split lines and skip header row
       const lines = csvText.trim().split('\n');
-      const dataLines = lines.slice(1);
+      const dataLines = lines.slice(1); // skip header
 
+      // Parse rooms, demote priority by 4 if completed
       const rooms = dataLines.map(line => {
-        const [name, priority, time] = line.split(',').map(s => s.trim());
-        return {
-          name,
-          priority: parseInt(priority),
-          time: parseInt(time)
-        };
+        const [name, priorityStr, timeStr] = line.split(',').map(s => s.trim());
+        let priority = parseInt(priorityStr);
+        const time = parseInt(timeStr);
+        if (completedRoomsSet.has(name)) {
+          priority += 4;  // demote priority by adding 4
+        }
+        return { name, priority, time };
       }).filter(r => r.name && !isNaN(r.priority) && !isNaN(r.time));
 
-      // Sort by priority ascending, then by time descending
+      // Sort by priority ascending (lower number = higher priority), then time descending
       rooms.sort((a, b) => a.priority - b.priority || b.time - a.time);
 
+      // Group into shifts of max 240 minutes
       const shifts = [];
       let currentShift = [];
       let currentTime = 0;
@@ -68,6 +113,7 @@
       }
       if (currentShift.length > 0) shifts.push(currentShift);
 
+      // Assign shifts to people alternating
       const people = ['Garrett', 'Thomas'];
       const shiftContainer = document.getElementById('shift-container');
       shiftContainer.innerHTML = '';
