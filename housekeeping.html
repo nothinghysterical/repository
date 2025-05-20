@@ -179,7 +179,7 @@
         const completed = !!entry;
         return {
           room,
-          status: completed ? '✅ Turned In' : '🟡 Pending',
+          status: completed ? '✅ Complete' : '🟡 Pending',
           lastDate: entry ? entry.lastDate : null,
           count: entry ? entry.count : 0,
           completedBy: entry ? entry.completedBy : '',
@@ -187,7 +187,7 @@
       });
 
       // Calculate completion %
-      const completedCount = rows.filter(r => r.status === '✅ Turned In').length;
+      const completedCount = rows.filter(r => r.status === '✅ Complete').length;
       const completionPercent = ((completedCount / rows.length) * 100).toFixed(1);
       document.getElementById('completion-percentage').textContent =
         `Completion: ${completedCount} / ${rows.length} rooms (${completionPercent}%)`;
