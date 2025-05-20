@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Room Cleaning Shifts</title>
+  <style>
+    body {
+      font-family: sans-serif;
+      margin: 20px;
+    }
+    h2 {
+      text-align: center;
+    }
+    .shift {
+      border: 1px solid #ccc;
+      border-radius: 10px;
+      padding: 10px;
+      margin-bottom: 20px;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+    }
+    .shift h3 {
+      margin-top: 0;
+    }
+    ul {
+      list-style-type: none;
+      padding-left: 0;
+    }
+    li {
+      padding: 4px 0;
+    }
+  </style>
+</head>
+<body>
+  <h2>Organized Room Cleaning Shifts (4 Hours Each)</h2>
+  <div id="shifts"></div>
+
+  <script>
+    async function loadRoomsAndAssignShifts() {
+      const csv = await fetch('rooms-shifts.csv').then(res => res.text());
+      const lines = csv.trim().split('\n').filter(Boolean);
+      const rooms = lines.map(line => {
+        const [name, priority, minutes] = line.split(',').map(s => s.trim());
+        return {
+          name,
+          priority: parseInt(priority, 10),
+          minutes: parseInt(minutes, 10)
+        };
+      });
+
+      rooms.sort((a, b) => a.priority - b.priority || b.minutes - a.minutes);
+
+      const shifts = [];
+      let currentShift = [];
+      let total = 0;
+
+      for (const room of rooms) {
+        if (total + room.minutes > 240) {
+          shifts.push(currentShift);
+          currentShift = [];
+          total = 0;
+        }
+        currentShift.push(room);
+        total += room.minutes;
+      }
+      if (currentShift.length) shifts.push(currentShift);
+
+      const container = document.getElementById('shifts');
+      const people = ['Garrett', 'Thomas'];
+
+      shifts.forEach((shift, index) => {
+        const div = document.createElement('div');
+        div.className = 'shift';
+        const totalTime = shift.reduce((sum, r) => sum + r.minutes, 0);
+        const assignedTo = people[Math.floor(Math.random() * people.length)];
+        div.innerHTML = `<h3>Shift ${index + 1} - Assigned to: ${assignedTo} (Total: ${totalTime} min)</h3><ul>` +
+          shift.map(r => `<li>${r.name} - Priority ${r.priority}, ${r.minutes} min</li>`).join('') +
+          '</ul>';
+        container.appendChild(div);
+      });
+    }
+
+    loadRoomsAndAssignShifts();
+  </script>
+</body>
+</html>
