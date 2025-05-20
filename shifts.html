@@ -6,81 +6,82 @@
   <title>Room Cleaning Shifts</title>
   <style>
     body {
-      font-family: sans-serif;
-      margin: 20px;
+      font-family: Arial, sans-serif;
+      margin: 2em;
     }
-    h2 {
+    h1 {
       text-align: center;
     }
     .shift {
       border: 1px solid #ccc;
-      border-radius: 10px;
-      padding: 10px;
-      margin-bottom: 20px;
-      box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+      border-radius: 8px;
+      padding: 1em;
+      margin-bottom: 1em;
+      background-color: #f9f9f9;
     }
-    .shift h3 {
+    .shift h2 {
       margin-top: 0;
     }
     ul {
-      list-style-type: none;
-      padding-left: 0;
-    }
-    li {
-      padding: 4px 0;
+      padding-left: 1.2em;
     }
   </style>
 </head>
 <body>
-  <h2>Organized Room Cleaning Shifts (4 Hours Each)</h2>
-  <div id="shifts"></div>
+  <h1>Organized Room Cleaning Shifts (4 Hours Each)</h1>
+  <div id="shift-container"></div>
 
   <script>
-    async function loadRoomsAndAssignShifts() {
-      const csv = await fetch('rooms-shifts.csv').then(res => res.text());
-      const lines = csv.trim().split('\n').filter(Boolean);
+    async function loadAndAssignShifts() {
+      const response = await fetch('rooms-shift.csv');
+      const csvText = await response.text();
+
+      const lines = csvText.trim().split('\n');
       const rooms = lines.map(line => {
-        const [name, priority, minutes] = line.split(',').map(s => s.trim());
+        const [name, priority, time] = line.split(',').map(s => s.trim());
         return {
           name,
-          priority: parseInt(priority, 10),
-          minutes: parseInt(minutes, 10)
+          priority: parseInt(priority),
+          time: parseInt(time)
         };
-      });
+      }).filter(r => r.name && !isNaN(r.priority) && !isNaN(r.time));
 
-      rooms.sort((a, b) => a.priority - b.priority || b.minutes - a.minutes);
+      // Sort rooms by priority and time
+      rooms.sort((a, b) => a.priority - b.priority || b.time - a.time);
 
       const shifts = [];
       let currentShift = [];
-      let total = 0;
+      let currentTime = 0;
+      const MAX_SHIFT_MINUTES = 240;
 
       for (const room of rooms) {
-        if (total + room.minutes > 240) {
+        if (currentTime + room.time > MAX_SHIFT_MINUTES && currentShift.length > 0) {
           shifts.push(currentShift);
           currentShift = [];
-          total = 0;
+          currentTime = 0;
         }
         currentShift.push(room);
-        total += room.minutes;
+        currentTime += room.time;
       }
-      if (currentShift.length) shifts.push(currentShift);
+      if (currentShift.length > 0) shifts.push(currentShift);
 
-      const container = document.getElementById('shifts');
       const people = ['Garrett', 'Thomas'];
+      const shiftContainer = document.getElementById('shift-container');
 
-      shifts.forEach((shift, index) => {
+      shifts.forEach((shift, i) => {
+        const assignedTo = people[i % people.length];
+        const totalTime = shift.reduce((sum, room) => sum + room.time, 0);
+
         const div = document.createElement('div');
         div.className = 'shift';
-        const totalTime = shift.reduce((sum, r) => sum + r.minutes, 0);
-        const assignedTo = people[Math.floor(Math.random() * people.length)];
-        div.innerHTML = `<h3>Shift ${index + 1} - Assigned to: ${assignedTo} (Total: ${totalTime} min)</h3><ul>` +
-          shift.map(r => `<li>${r.name} - Priority ${r.priority}, ${r.minutes} min</li>`).join('') +
-          '</ul>';
-        container.appendChild(div);
+        div.innerHTML = `<h2>Shift ${i + 1} - Assigned to: ${assignedTo} (Total: ${totalTime} min)</h2><ul>` +
+          shift.map(room => `<li>${room.name} - Priority ${room.priority}, ${room.time} min</li>`).join('') +
+          `</ul>`;
+        shiftContainer.appendChild(div);
       });
     }
 
-    loadRoomsAndAssignShifts();
+    loadAndAssignShifts();
   </script>
 </body>
 </html>
