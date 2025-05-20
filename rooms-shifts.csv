@@ -1,0 +1,70 @@
+Room,Priority,Time
+Room 100,1,30
+Room 102,2,30
+Room 103,3,30
+Room 104,4,30
+Room 108-110,1,30
+Room 111,2,30
+Room 112,3,30
+Room 113,4,30
+Kitchen,1,60
+Room 118,2,30
+Bathroom 118,3,45
+Room 120,4,30
+Bathroom 92-1-1,1,45
+Bathroom 92-1-2,2,45
+Hallway 92-1,3,60
+Entrance E,4,30
+Stairwell E,1,30
+Stairwell B,2,30
+Hallway 92-2,3,60
+Worship Center,4,120
+Bathroom 92-2-1,1,45
+Bathroom 92-2-2,2,45
+Hallway 92-3,3,30
+Bathroom 92-3-1,4,45
+Bathroom 92-3-2,1,45
+Worship Center Balcony,2,60
+Stairwell C,3,30
+Stairwell D,4,30
+Hallway 72-1,1,30
+Bathroom 72-1-1,2,45
+Bathroom 72-1-2,3,45
+Room 124,4,30
+Room 127,1,30
+Room 130,2,30
+Stairwell F,3,30
+Entrance F,4,30
+Hallway 72-2,1,45
+Bathroom 72-2-1,2,45
+Bathroom 72-2-2,3,45
+Room Zone,4,120
+Bathroom Zone,1,30
+Kitchen 72-2,2,30
+Entrance A,3,45
+Room 220,4,30
+Hallway 72-3,1,45
+Bathroom 72-3-1,2,45
+Bathroom 72-3-2,3,45
+Room 320,4,30
+Room 323,1,30
+Room 326,2,30
+Room 328,3,30
+Room 330,4,60
+Room Office,1,60
+Hallway 25-1,2,30
+Bathroom 25-1-1,3,45
+Bathroom 25-1-2,4,45
+Kitchen Office,1,30
+Room Conf,2,30
+Room Meet 1,3,20
+Room Meet 2,4,20
+Room Meet 3,1,20
+Stairwell G,2,30
+Gym,3,60
+Hallway 25-2,4,30
+Bathroom 25-2-1,1,45
+Bathroom 25-2-2,2,45
+Room 250,3,30
+Room 254,4,30
+Gym Balcony,1,30
