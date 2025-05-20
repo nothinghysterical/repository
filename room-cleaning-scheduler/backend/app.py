@@ -4,7 +4,7 @@ from datetime import datetime
 
 app = Flask(__name__)
 
-ACCESS_TOKEN = "your-secure-access-token"  # Replace with env var in production
+ACCESS_TOKEN = "0012d717caf3910302c883ab5106c2c4b0047f87d9cdac470da3d9100b854e52"  # Replace with env var in production
 
 @app.route("/api/room-usage")
 def get_room_usage():
