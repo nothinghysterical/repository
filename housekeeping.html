@@ -1,90 +1,20 @@
 <!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8" />
-  <title>Room Check-In Status (This Week)</title>
-  <style>
-    table { border-collapse: collapse; width: 100%; max-width: 700px; }
-    th, td { padding: 8px 12px; border: 1px solid #ccc; text-align: left; }
-    .status-ok { background-color: #d4edda; color: #155724; font-weight: bold; }
-    .status-missing { background-color: #f8d7da; color: #721c24; font-weight: bold; }
-  </style>
-</head>
+<html>
 <body>
-  <h2>Room Check-Ins This Week (Mon-Sun)</h2>
-  <table id="status-table">
-    <thead><tr><th>Room</th><th>Status</th></tr></thead>
-    <tbody></tbody>
-  </table>
+  <h1>Jotform API Test</h1>
+  <pre id="output"></pre>
 
   <script>
     const apiKey = '5b9a10e2092947d49dac84004ad149a2';
     const formId = '250955404825056';
-    const roomFieldId = 'space'; // update as needed
-
-    const allRooms = [
-      "Room 100", "Room 102", "Room 103", "Room 104", "Room 108-110", "Room 111", "Room 112", "Room 113",
-      "Kitchen", "Room 118", "Bathroom 118", "Room 120", "Bathroom 92-1-1", "Bathroom 92-1-2", "Hallway 92-1",
-      "Entrance E", "Stairwell E", "Stairwell B", "Hallway 92-2", "Worship Center", "Bathroom 92-2-1", "Bathroom 92-2-2",
-      "Hallway 92-3", "Bathroom 92-3-1", "Bathroom 92-3-2", "Worship Center Balcony", "Stairwell C", "Stairwell D",
-      "Hallway 72-1", "Bathroom 72-1-1", "Bathroom 72-1-2", "Room 124", "Room 127", "Room 130", "Stairwell F",
-      "Entrance F", "Hallway 72-2", "Bathroom 72-2-1", "Bathroom 72-2-2", "Room Zone", "Bathroom Zone", "Kitchen 72-2",
-      "Entrance A", "Room 220", "Hallway 72-3", "Bathroom 72-3-1", "Bathroom 72-3-2", "Room 320", "Room 323", "Room 326",
-      "Room 328", "Room 330", "Room Office", "Hallway 25-1", "Bathroom 25-1-1", "Bathroom 25-1-2", "Kitchen Office",
-      "Room Conf", "Room Meet 1", "Room Meet 2", "Room Meet 3", "Stairwell G", "Gym", "Hallway 25-2", "Bathroom 25-2-1",
-      "Bathroom 25-2-2", "Room 250", "Room 254", "Gym Balcony"
-    ];
-
-    function getWeekBounds() {
-      const now = new Date();
-      const day = now.getDay(); // Sunday=0, Monday=1,... Saturday=6
-      const diffToMonday = (day === 0) ? -6 : 1 - day;
-      const monday = new Date(now);
-      monday.setHours(0,0,0,0);
-      monday.setDate(now.getDate() + diffToMonday);
-
-      const sunday = new Date(monday);
-      sunday.setDate(monday.getDate() + 6);
-      sunday.setHours(23,59,59,999);
-
-      return { monday, sunday };
-    }
-
-    const { monday, sunday } = getWeekBounds();
 
     fetch(`https://api.jotform.com/form/${formId}/submissions?apiKey=${apiKey}`)
       .then(res => res.json())
       .then(data => {
-        const submissions = data.content || [];
-        const recentRooms = new Set();
-
-        submissions.forEach(sub => {
-          const submittedAt = new Date(sub.created_at);
-          if (submittedAt >= monday && submittedAt <= sunday) {
-            const roomName = sub.answers[roomFieldId]?.answer?.trim();
-            if (roomName) recentRooms.add(roomName);
-          }
-        });
-
-        const tbody = document.querySelector("#status-table tbody");
-        tbody.innerHTML = '';
-
-        allRooms.forEach(room => {
-          const hasTurnedIn = recentRooms.has(room);
-          const statusText = hasTurnedIn ? "✅ Turned In" : "❌ Missing";
-          const statusClass = hasTurnedIn ? "status-ok" : "status-missing";
-
-          tbody.insertAdjacentHTML('beforeend', `
-            <tr>
-              <td>${room}</td>
-              <td class="${statusClass}">${statusText}</td>
-            </tr>
-          `);
-        });
+        document.getElementById('output').textContent = JSON.stringify(data, null, 2);
       })
       .catch(err => {
-        console.error(err);
-        document.body.insertAdjacentHTML('beforeend', '<p style="color:red;">Error loading submissions</p>');
+        document.getElementById('output').textContent = 'Error: ' + err.message;
       });
   </script>
 </body>
