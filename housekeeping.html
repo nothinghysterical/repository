@@ -18,6 +18,7 @@
         <th>Room</th>
         <th>Status</th>
         <th>Last Check-In</th>
+        <th>Submissions Count</th>
       </tr>
     </thead>
     <tbody></tbody>
@@ -47,24 +48,27 @@
     fetch('rooms.csv')
       .then(response => response.text())
       .then(text => {
-        // Simple CSV parsing: split by line and trim
         const allRooms = text.split('\n').map(line => line.trim()).filter(line => line.length > 0);
 
-        // Now fetch submissions
+        // Fetch submissions
         return fetch(`https://api.jotform.com/form/${formId}/submissions?apiKey=${apiKey}`)
           .then(res => res.json())
           .then(data => {
             const submissions = data.content || [];
             const latestCheckInByRoom = {};
+            const submissionsCountByRoom = {};
 
             submissions.forEach(sub => {
               const submittedAt = new Date(sub.created_at);
               if (submittedAt >= monday && submittedAt <= sunday) {
                 const roomName = sub.answers[roomFieldId]?.answer?.trim();
                 if (roomName) {
+                  // Track latest check-in
                   if (!latestCheckInByRoom[roomName] || submittedAt > latestCheckInByRoom[roomName]) {
                     latestCheckInByRoom[roomName] = submittedAt;
                   }
+                  // Track submissions count
+                  submissionsCountByRoom[roomName] = (submissionsCountByRoom[roomName] || 0) + 1;
                 }
               }
             });
@@ -74,8 +78,9 @@
 
             allRooms.forEach(room => {
               const lastCheckInDate = latestCheckInByRoom[room];
+              const count = submissionsCountByRoom[room] || 0;
               const hasTurnedIn = !!lastCheckInDate;
-              const statusText = hasTurnedIn ? "✅ Complete" : "❌ Pending";
+              const statusText = hasTurnedIn ? "✅ Turned In" : "❌ Missing";
               const statusClass = hasTurnedIn ? "status-ok" : "status-missing";
               const lastCheckInFormatted = hasTurnedIn
                 ? lastCheckInDate.toLocaleString(undefined, { dateStyle: 'short', timeStyle: 'short' })
@@ -86,6 +91,7 @@
                   <td>${room}</td>
                   <td class="${statusClass}">${statusText}</td>
                   <td>${lastCheckInFormatted}</td>
+                  <td>${count}</td>
                 </tr>
               `);
             });
