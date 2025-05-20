@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Room Cleaning Shifts</title>
   <style>
     body {
@@ -33,11 +33,14 @@
 
   <script>
     async function loadAndAssignShifts() {
-      const response = await fetch('rooms-shift.csv');
+      const response = await fetch('rooms-shifts.csv');
       const csvText = await response.text();
 
+      // Split lines and skip header row
       const lines = csvText.trim().split('\n');
-      const rooms = lines.map(line => {
+      const dataLines = lines.slice(1);
+
+      const rooms = dataLines.map(line => {
         const [name, priority, time] = line.split(',').map(s => s.trim());
         return {
           name,
@@ -46,7 +49,7 @@
         };
       }).filter(r => r.name && !isNaN(r.priority) && !isNaN(r.time));
 
-      // Sort rooms by priority and time
+      // Sort by priority ascending, then by time descending
       rooms.sort((a, b) => a.priority - b.priority || b.time - a.time);
 
       const shifts = [];
@@ -67,6 +70,7 @@
 
       const people = ['Garrett', 'Thomas'];
       const shiftContainer = document.getElementById('shift-container');
+      shiftContainer.innerHTML = '';
 
       shifts.forEach((shift, i) => {
         const assignedTo = people[i % people.length];
