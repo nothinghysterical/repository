@@ -72,11 +72,11 @@
     }
 
     input[type="text"] {
-      margin: 5px;
+      margin: 5px auto;
       padding: 5px;
       width: 100%;
-      max-width: 200px;
-      display: inline-block;
+      max-width: 300px;
+      display: block;
     }
 
     @media (max-width: 600px) {
@@ -93,10 +93,7 @@
     <div class="progress-bar" id="completion-bar" style="width: 0%">0%</div>
   </div>
 
-  <div class="summary">
-    <input type="text" id="filter-room" placeholder="Filter by Room..." />
-    <input type="text" id="filter-completedby" placeholder="Filter by Completed By..." />
-  </div>
+  <input type="text" id="filter" placeholder="Search rooms or names..." />
 
   <table id="status-table">
     <thead>
@@ -144,7 +141,7 @@
     async function main() {
       const { monday, sunday } = getWeekBounds();
       document.getElementById('week-summary').innerText =
-        `Week: ${monday.toLocaleDateString()} – ${sunday.toLocaleDateString()}`;
+        `${monday.toLocaleDateString()} – ${sunday.toLocaleDateString()}`;
 
       const roomCsv = await fetch('rooms.csv').then(res => res.text());
       const allRooms = parseCSV(roomCsv);
@@ -192,8 +189,6 @@
       });
 
       const percentComplete = Math.round((rows.filter(r => r.status.includes('✅')).length / allRooms.length) * 100);
-      document.getElementById('week-summary').innerHTML += `<br>Completed: ${percentComplete}%`;
-
       const progressBar = document.getElementById('completion-bar');
       progressBar.style.width = `${percentComplete}%`;
       progressBar.textContent = `${percentComplete}%`;
@@ -234,22 +229,20 @@
       });
 
       function applyFilters() {
-        const roomFilter = document.getElementById('filter-room').value.toLowerCase();
-        const byFilter = document.getElementById('filter-completedby').value.toLowerCase();
+        const query = document.getElementById('filter').value.toLowerCase();
         const filtered = rows.filter(r =>
-          r.room.toLowerCase().includes(roomFilter) &&
-          r.completedBy.toLowerCase().includes(byFilter)
+          r.room.toLowerCase().includes(query) ||
+          r.completedBy.toLowerCase().includes(query)
         );
         renderTable(filtered);
       }
 
-      document.getElementById('filter-room').addEventListener('input', applyFilters);
-      document.getElementById('filter-completedby').addEventListener('input', applyFilters);
+      document.getElementById('filter').addEventListener('input', applyFilters);
 
       const urlRoom = getUrlParam('room');
       const urlBy = getUrlParam('by');
-      if (urlRoom) document.getElementById('filter-room').value = urlRoom;
-      if (urlBy) document.getElementById('filter-completedby').value = urlBy;
+      if (urlRoom) document.getElementById('filter').value = urlRoom;
+      else if (urlBy) document.getElementById('filter').value = urlBy;
 
       applyFilters();
     }
