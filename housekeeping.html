@@ -1,195 +1,58 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8" />
-  <title>Room Check-In Status (This Week)</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <style>
-    body {
-      font-family: Arial, sans-serif;
-      margin: 1em;
-      padding: 0;
-      background: #f9f9f9;
-      color: #333;
-    }
-    h2 {
-      font-size: 1.5em;
-      margin-bottom: 0.3em;
-    }
-    #summary {
-      font-weight: bold;
-      margin-bottom: 1em;
-      font-size: 1em;
+<style>
+  body {
+    font-family: Arial, sans-serif;
+    margin: 1em;
+    padding: 0;
+    background: #f9f9f9;
+    color: #333;
+  }
+  #table-container {
+    overflow-x: auto; /* Allow horizontal scroll only for the table */
+    -webkit-overflow-scrolling: touch; /* Smooth scrolling on iOS */
+  }
+  table {
+    border-collapse: collapse;
+    width: 100%;
+    max-width: 700px;
+    margin: 0 auto;
+    background: white;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+    font-size: 0.9em;
+    table-layout: fixed; /* Makes cells respect width */
+    word-wrap: break-word; /* Wrap long words */
+  }
+  th, td {
+    padding: 8px 12px;
+    border: 1px solid #ccc;
+    text-align: left;
+    word-break: break-word; /* Wrap long content */
+  }
+  /* Responsive tweaks */
+  @media (max-width: 600px) {
+    #table-container {
+      max-width: 100vw;
     }
     table {
-      border-collapse: collapse;
-      width: 100%;
-      max-width: 700px;
-      margin: 0 auto;
-      background: white;
-      box-shadow: 0 2px 5px rgba(0,0,0,0.1);
-      font-size: 0.9em;
+      font-size: 0.85em;
     }
     th, td {
-      padding: 8px 12px;
-      border: 1px solid #ccc;
-      text-align: left;
-      word-break: break-word;
+      padding: 6px 8px;
     }
-    th {
-      background-color: #f2f2f2;
-    }
-    .status-ok {
-      background-color: #d4edda;
-      color: #155724;
-      font-weight: bold;
-    }
-    .status-missing {
-      background-color: #f8d7da;
-      color: #721c24;
-      font-weight: bold;
-    }
-
-    /* Responsive adjustments */
-    @media (max-width: 600px) {
-      table, thead, tbody, th, td, tr {
-        display: block;
-      }
-      thead tr {
-        display: none;
-      }
-      tr {
-        margin-bottom: 1em;
-        border: 1px solid #ddd;
-        border-radius: 8px;
-        background: #fff;
-        padding: 10px;
-      }
-      td {
-        border: none;
-        padding: 6px 10px;
-        position: relative;
-        padding-left: 50%;
-        text-align: left;
-      }
-      td::before {
-        position: absolute;
-        top: 6px;
-        left: 10px;
-        width: 45%;
-        white-space: nowrap;
-        font-weight: bold;
-        content: attr(data-label);
-        color: #555;
-      }
-      #summary {
-        font-size: 1.1em;
-        text-align: center;
-      }
-    }
-  </style>
-</head>
+  }
+</style>
 <body>
   <h2>Room Check-Ins This Week (Mon-Sun)</h2>
   <div id="summary"></div>
-  <table id="status-table" aria-describedby="summary">
-    <thead>
-      <tr>
-        <th scope="col">Room</th>
-        <th scope="col">Status</th>
-        <th scope="col">Last Check-In</th>
-        <th scope="col">Submissions Count</th>
-      </tr>
-    </thead>
-    <tbody></tbody>
-  </table>
-
-  <script>
-    const apiKey = '5b9a10e2092947d49dac84004ad149a2';
-    const formId = '250955404825056';
-    const roomFieldId = '18';
-
-    function getWeekBounds() {
-      const now = new Date();
-      const day = now.getDay();
-      const diffToMonday = (day === 0) ? -6 : 1 - day;
-      const monday = new Date(now);
-      monday.setHours(0,0,0,0);
-      monday.setDate(now.getDate() + diffToMonday);
-      const sunday = new Date(monday);
-      sunday.setDate(monday.getDate() + 6);
-      sunday.setHours(23,59,59,999);
-      return { monday, sunday };
-    }
-
-    const { monday, sunday } = getWeekBounds();
-
-    function formatDate(date) {
-      return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
-    }
-
-    const summaryDiv = document.getElementById('summary');
-    summaryDiv.textContent = `Week: ${formatDate(monday)} - ${formatDate(sunday)}`;
-
-    fetch('rooms.csv')
-      .then(response => response.text())
-      .then(text => {
-        const allRooms = text.split('\n').map(line => line.trim()).filter(line => line.length > 0);
-
-        return fetch(`https://api.jotform.com/form/${formId}/submissions?apiKey=${apiKey}`)
-          .then(res => res.json())
-          .then(data => {
-            const submissions = data.content || [];
-            const latestCheckInByRoom = {};
-            const submissionsCountByRoom = {};
-
-            submissions.forEach(sub => {
-              const submittedAt = new Date(sub.created_at);
-              if (submittedAt >= monday && submittedAt <= sunday) {
-                const roomName = sub.answers[roomFieldId]?.answer?.trim();
-                if (roomName) {
-                  if (!latestCheckInByRoom[roomName] || submittedAt > latestCheckInByRoom[roomName]) {
-                    latestCheckInByRoom[roomName] = submittedAt;
-                  }
-                  submissionsCountByRoom[roomName] = (submissionsCountByRoom[roomName] || 0) + 1;
-                }
-              }
-            });
-
-            const tbody = document.querySelector("#status-table tbody");
-            tbody.innerHTML = '';
-
-            let completedCount = 0;
-
-            allRooms.forEach(room => {
-              const lastCheckInDate = latestCheckInByRoom[room];
-              const count = submissionsCountByRoom[room] || 0;
-              const hasTurnedIn = !!lastCheckInDate;
-              if (hasTurnedIn) completedCount++;
-              const statusText = hasTurnedIn ? "✅ Turned In" : "❌ Missing";
-              const statusClass = hasTurnedIn ? "status-ok" : "status-missing";
-              const lastCheckInFormatted = hasTurnedIn
-                ? lastCheckInDate.toLocaleString(undefined, { dateStyle: 'short', timeStyle: 'short' })
-                : '-';
-
-              tbody.insertAdjacentHTML('beforeend', `
-                <tr>
-                  <td data-label="Room">${room}</td>
-                  <td data-label="Status" class="${statusClass}">${statusText}</td>
-                  <td data-label="Last Check-In">${lastCheckInFormatted}</td>
-                  <td data-label="Submissions Count">${count}</td>
-                </tr>
-              `);
-            });
-
-            const percentage = ((completedCount / allRooms.length) * 100).toFixed(1);
-            summaryDiv.textContent += ` | Rooms Completed: ${completedCount} of ${allRooms.length} (${percentage}%)`;
-          });
-      })
-      .catch(err => {
-        console.error(err);
-        document.body.insertAdjacentHTML('beforeend', '<p style="color:red;">Error loading rooms or submissions</p>');
-      });
-  </script>
-</body>
-</html>
+  <div id="table-container">
+    <table id="status-table" aria-describedby="summary">
+      <thead>
+        <tr>
+          <th scope="col">Room</th>
+          <th scope="col">Status</th>
+          <th scope="col">Last Check-In</th>
+          <th scope="col">Submissions Count</th>
+        </tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+  </div>
