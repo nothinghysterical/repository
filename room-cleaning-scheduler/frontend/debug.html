@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Room Cleaning Schedule Debug</title>
+<style>
+  body { font-family: sans-serif; padding: 1em; }
+  pre { background: #eee; padding: 1em; overflow-x: auto; max-height: 400px; }
+  .error { color: red; }
+</style>
+</head>
+<body>
+  <h1>Room Cleaning Schedule Debug</h1>
+  <p>Fetching room data from <code>/api/rooms</code>...</p>
+  <div id="output"></div>
+
+<script>
+async function fetchRooms() {
+  const output = document.getElementById('output');
+  output.textContent = 'Loading...';
+
+  try {
+    const response = await fetch('/api/rooms');
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+    const data = await response.json();
+    console.log('Fetched rooms data:', data);
+    output.innerHTML = '<h2>Rooms Data (JSON)</h2><pre>' + JSON.stringify(data, null, 2) + '</pre>';
+  } catch (err) {
+    console.error('Fetch error:', err);
+    output.innerHTML = `<p class="error">Error fetching room data:<br>${err.message}</p>`;
+  }
+}
+
+fetchRooms();
+</script>
+</body>
+</html>
