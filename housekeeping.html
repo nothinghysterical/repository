@@ -13,14 +13,20 @@
 <body>
   <h2>Room Check-Ins This Week (Mon-Sun)</h2>
   <table id="status-table">
-    <thead><tr><th>Room</th><th>Status</th></tr></thead>
+    <thead>
+      <tr>
+        <th>Room</th>
+        <th>Status</th>
+        <th>Last Check-In</th>
+      </tr>
+    </thead>
     <tbody></tbody>
   </table>
 
   <script>
     const apiKey = '5b9a10e2092947d49dac84004ad149a2';
     const formId = '250955404825056';
-    const roomFieldId = '18'; // update as needed
+    const roomFieldId = '18'; // or 'space' if using field name; adjust as needed
 
     const allRooms = [
       "Room 100", "Room 102", "Room 103", "Room 104", "Room 108-110", "Room 111", "Room 112", "Room 113",
@@ -56,13 +62,19 @@
       .then(res => res.json())
       .then(data => {
         const submissions = data.content || [];
-        const recentRooms = new Set();
+
+        // Map room name => latest created_at Date object
+        const latestCheckInByRoom = {};
 
         submissions.forEach(sub => {
           const submittedAt = new Date(sub.created_at);
           if (submittedAt >= monday && submittedAt <= sunday) {
             const roomName = sub.answers[roomFieldId]?.answer?.trim();
-            if (roomName) recentRooms.add(roomName);
+            if (roomName) {
+              if (!latestCheckInByRoom[roomName] || submittedAt > latestCheckInByRoom[roomName]) {
+                latestCheckInByRoom[roomName] = submittedAt;
+              }
+            }
           }
         });
 
@@ -70,14 +82,19 @@
         tbody.innerHTML = '';
 
         allRooms.forEach(room => {
-          const hasTurnedIn = recentRooms.has(room);
+          const lastCheckInDate = latestCheckInByRoom[room];
+          const hasTurnedIn = !!lastCheckInDate;
           const statusText = hasTurnedIn ? "✅ Turned In" : "❌ Missing";
           const statusClass = hasTurnedIn ? "status-ok" : "status-missing";
+          const lastCheckInFormatted = hasTurnedIn
+            ? lastCheckInDate.toLocaleString(undefined, { dateStyle: 'short', timeStyle: 'short' })
+            : '-';
 
           tbody.insertAdjacentHTML('beforeend', `
             <tr>
               <td>${room}</td>
               <td class="${statusClass}">${statusText}</td>
+              <td>${lastCheckInFormatted}</td>
             </tr>
           `);
         });
