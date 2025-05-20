@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Room Cleaning Shifts</title>
+    <style>
+        .bold { font-weight: bold; }
+    </style>
+</head>
+<body>
+    <h1>Room Cleaning Schedule</h1>
+    <div id="schedule-container"></div>
+    <script>
+    async function fetchRoomUsage() {
+        const res = await fetch('/api/room-usage');
+        const data = await res.json();
+        return data;
+    }
+
+    async function renderSchedule() {
+        const usage = await fetchRoomUsage();
+        const container = document.getElementById('schedule-container');
+        container.innerHTML = '';
+
+        const rooms = Object.keys(usage).sort((a, b) => usage[a] - usage[b]);
+        rooms.forEach(room => {
+            const daysAgo = usage[room];
+            const el = document.createElement('div');
+            if (daysAgo <= 2) {
+                el.classList.add('bold');
+            }
+            el.textContent = room + " (last used: " + daysAgo + " days ago)";
+            container.appendChild(el);
+        });
+    }
+
+    renderSchedule();
+    </script>
+</body>
+</html>
