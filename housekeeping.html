@@ -21,6 +21,15 @@
       margin-bottom: 1em;
       font-size: 1em;
     }
+    #filter-container {
+      margin-bottom: 1em;
+    }
+    #filter {
+      padding: 8px;
+      width: 100%;
+      max-width: 400px;
+      font-size: 1em;
+    }
     table {
       border-collapse: collapse;
       width: 100%;
@@ -35,6 +44,7 @@
     }
     th {
       background-color: #f2f2f2;
+      cursor: pointer;
     }
     .status-ok {
       background-color: #d4edda;
@@ -46,7 +56,6 @@
       color: #721c24;
       font-weight: bold;
     }
-
     @media (max-width: 600px) {
       table, thead, tbody, th, td, tr {
         display: block;
@@ -82,13 +91,16 @@
 <body>
   <h2>Room Check-Ins This Week (Mon-Sun)</h2>
   <div id="summary"></div>
-  <table id="status-table" aria-describedby="summary">
+  <div id="filter-container">
+    <input type="text" id="filter" placeholder="Filter rooms by name...">
+  </div>
+  <table id="status-table">
     <thead>
       <tr>
-        <th>Room</th>
-        <th>Status</th>
-        <th>Last Check-In</th>
-        <th>Submissions Count</th>
+        <th data-key="room">Room</th>
+        <th data-key="status">Status</th>
+        <th data-key="lastCheckIn">Last Check-In</th>
+        <th data-key="count">Submissions Count</th>
       </tr>
     </thead>
     <tbody></tbody>
@@ -98,6 +110,7 @@
     const apiKey = '5b9a10e2092947d49dac84004ad149a2';
     const formId = '250955404825056';
     const roomFieldId = '18';
+    const tbody = document.querySelector("#status-table tbody");
 
     function getWeekBounds() {
       const now = new Date();
@@ -113,19 +126,38 @@
     }
 
     const { monday, sunday } = getWeekBounds();
+    document.getElementById('summary').textContent = `Week: ${monday.toDateString()} - ${sunday.toDateString()}`;
 
     function formatDate(date) {
-      return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
+      return date.toLocaleString(undefined, { dateStyle: 'short', timeStyle: 'short' });
     }
 
-    const summaryDiv = document.getElementById('summary');
-    summaryDiv.textContent = `Week: ${formatDate(monday)} - ${formatDate(sunday)}`;
+    let tableData = [];
+
+    function renderTable(data) {
+      tbody.innerHTML = '';
+      data.forEach(row => {
+        tbody.insertAdjacentHTML('beforeend', `
+          <tr>
+            <td data-label="Room">${row.room}</td>
+            <td data-label="Status" class="${row.statusClass}">${row.status}</td>
+            <td data-label="Last Check-In">${row.lastCheckIn}</td>
+            <td data-label="Submissions Count">${row.count}</td>
+          </tr>
+        `);
+      });
+    }
+
+    function updateSummary(data) {
+      const completedCount = data.filter(row => row.statusClass === "status-ok").length;
+      const percentage = ((completedCount / data.length) * 100).toFixed(1);
+      document.getElementById('summary').textContent += ` | Rooms Completed: ${completedCount} of ${data.length} (${percentage}%)`;
+    }
 
     fetch('rooms.csv')
-      .then(response => response.text())
+      .then(res => res.text())
       .then(text => {
-        const allRooms = text.split('\n').map(line => line.trim()).filter(line => line.length > 0);
-
+        const allRooms = text.split('\n').map(r => r.trim()).filter(Boolean);
         return fetch(`https://api.jotform.com/form/${formId}/submissions?apiKey=${apiKey}`)
           .then(res => res.json())
           .then(data => {
@@ -146,40 +178,43 @@
               }
             });
 
-            const tbody = document.querySelector("#status-table tbody");
-            tbody.innerHTML = '';
-
-            let completedCount = 0;
-
-            allRooms.forEach(room => {
+            tableData = allRooms.map(room => {
               const lastCheckInDate = latestCheckInByRoom[room];
               const count = submissionsCountByRoom[room] || 0;
               const hasTurnedIn = !!lastCheckInDate;
-              if (hasTurnedIn) completedCount++;
-              const statusText = hasTurnedIn ? "✅ Turned In" : "❌ Missing";
-              const statusClass = hasTurnedIn ? "status-ok" : "status-missing";
-              const lastCheckInFormatted = hasTurnedIn
-                ? lastCheckInDate.toLocaleString(undefined, { dateStyle: 'short', timeStyle: 'short' })
-                : '-';
-
-              tbody.insertAdjacentHTML('beforeend', `
-                <tr>
-                  <td data-label="Room">${room}</td>
-                  <td data-label="Status" class="${statusClass}">${statusText}</td>
-                  <td data-label="Last Check-In">${lastCheckInFormatted}</td>
-                  <td data-label="Submissions Count">${count}</td>
-                </tr>
-              `);
+              return {
+                room,
+                status: hasTurnedIn ? "✅ Turned In" : "❌ Missing",
+                statusClass: hasTurnedIn ? "status-ok" : "status-missing",
+                lastCheckIn: hasTurnedIn ? formatDate(lastCheckInDate) : '-',
+                count
+              };
             });
 
-            const percentage = ((completedCount / allRooms.length) * 100).toFixed(1);
-            summaryDiv.textContent += ` | Rooms Completed: ${completedCount} of ${allRooms.length} (${percentage}%)`;
+            renderTable(tableData);
+            updateSummary(tableData);
           });
-      })
-      .catch(err => {
-        console.error(err);
-        document.body.insertAdjacentHTML('beforeend', '<p style="color:red;">Error loading rooms or submissions</p>');
       });
+
+    // Sorting
+    document.querySelectorAll('th').forEach(th => {
+      th.addEventListener('click', () => {
+        const key = th.dataset.key;
+        const isNumeric = key === 'count';
+        const sorted = [...tableData].sort((a, b) => {
+          if (isNumeric) return b[key] - a[key];
+          return (a[key] || '').localeCompare(b[key] || '');
+        });
+        renderTable(sorted);
+      });
+    });
+
+    // Filtering
+    document.getElementById('filter').addEventListener('input', (e) => {
+      const search = e.target.value.toLowerCase();
+      const filtered = tableData.filter(row => row.room.toLowerCase().includes(search));
+      renderTable(filtered);
+    });
   </script>
 </body>
 </html>
