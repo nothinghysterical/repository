@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Room Check-In Status (This Week)</title>
+  <style>
+    body {
+      font-family: sans-serif;
+      margin: 20px;
+    }
+
+    h2, h4 {
+      text-align: center;
+    }
+
+    .summary {
+      margin-bottom: 1em;
+      text-align: center;
+    }
+
+    .progress-container {
+      width: 100%;
+      max-width: 600px;
+      background-color: #e0e0e0;
+      border-radius: 10px;
+      overflow: hidden;
+      margin: 10px auto 20px;
+      height: 24px;
+    }
+
+    .progress-bar {
+      height: 100%;
+      background-color: #28a745;
+      color: white;
+      font-weight: bold;
+      text-align: center;
+      white-space: nowrap;
+      transition: width 0.4s ease;
+    }
+
+    table {
+      border-collapse: collapse;
+      width: 100%;
+      max-width: 100%;
+      overflow-x: auto;
+      display: block;
+    }
+
+    th, td {
+      padding: 8px 12px;
+      border: 1px solid #ccc;
+      text-align: left;
+      white-space: nowrap;
+    }
+
+    th {
+      cursor: pointer;
+      background-color: #f2f2f2;
+    }
+
+    .status-ok {
+      background-color: #d4edda;
+      color: #155724;
+      font-weight: bold;
+    }
+
+    .status-missing {
+      background-color: #fff3cd;
+      color: #856404;
+      font-weight: bold;
+    }
+
+    input[type="text"] {
+      margin: 5px auto;
+      padding: 5px;
+      width: 100%;
+      max-width: 300px;
+      display: block;
+    }
+
+    @media (max-width: 600px) {
+      table, thead, tbody, th, td, tr {
+        font-size: 14px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <h2>Room Check-Ins This Week (Mon–Sun)</h2>
+  <div class="summary" id="week-summary"></div>
+  <div class="progress-container">
+    <div class="progress-bar" id="completion-bar" style="width: 0%">0%</div>
+  </div>
+
+  <input type="text" id="filter" placeholder="Search rooms or names..." />
+
+  <table id="status-table">
+    <thead>
+      <tr>
+        <th data-key="room">Room</th>
+        <th data-key="status">Status</th>
+        <th data-key="lastDate">Last Submission</th>
+        <th data-key="count">Count</th>
+        <th data-key="completedBy">Completed By</th>
+      </tr>
+    </thead>
+    <tbody></tbody>
+  </table>
+
+  <script>
+    const apiKey = '5b9a10e2092947d49dac84004ad149a2';
+    const formId = '250955404825056';
+    const roomFieldId = '18';
+    const completedByFieldId = '29';
+
+    function getWeekBounds() {
+      const now = new Date();
+      const day = now.getDay();
+      const diffToMonday = (day === 0) ? -6 : 1 - day;
+      const monday = new Date(now);
+      monday.setHours(0, 0, 0, 0);
+      monday.setDate(now.getDate() + diffToMonday);
+
+      const sunday = new Date(monday);
+      sunday.setDate(monday.getDate() + 6);
+      sunday.setHours(23, 59, 59, 999);
+
+      return { monday, sunday };
+    }
+
+    function parseCSV(text) {
+      return text.trim().split('\n').map(line => line.trim()).filter(Boolean);
+    }
+
+    function getUrlParam(param) {
+      const url = new URL(window.location);
+      return url.searchParams.get(param);
+    }
+
+    async function main() {
+      const { monday, sunday } = getWeekBounds();
+      document.getElementById('week-summary').innerText =
+        `${monday.toLocaleDateString()} – ${sunday.toLocaleDateString()}`;
+
+      const roomCsv = await fetch('rooms.csv').then(res => res.text());
+      const allRooms = parseCSV(roomCsv);
+      const submissions = await fetch(`https://api.jotform.com/form/${formId}/submissions?apiKey=${apiKey}`)
+        .then(res => res.json())
+        .then(data => data.content || []);
+
+      const roomsMap = new Map();
+
+      submissions.forEach(sub => {
+        const createdAt = new Date(sub.created_at);
+        if (createdAt < monday || createdAt > sunday) return;
+
+        const room = sub.answers?.[roomFieldId]?.answer?.trim();
+        const completedBy = sub.answers?.[completedByFieldId]?.answer?.trim() || '';
+
+        if (!room) return;
+
+        if (!roomsMap.has(room)) {
+          roomsMap.set(room, {
+            count: 1,
+            lastDate: createdAt,
+            completedBy
+          });
+        } else {
+          const entry = roomsMap.get(room);
+          entry.count += 1;
+          if (createdAt > entry.lastDate) {
+            entry.lastDate = createdAt;
+            entry.completedBy = completedBy;
+          }
+        }
+      });
+
+      const rows = allRooms.map(room => {
+        const entry = roomsMap.get(room);
+        const completed = !!entry;
+        return {
+          room,
+          status: completed ? '✅ Completed' : '🟡 Pending',
+          lastDate: entry ? entry.lastDate.toLocaleString() : '',
+          count: entry ? entry.count : 0,
+          completedBy: entry ? entry.completedBy : '',
+        };
+      });
+
+      const percentComplete = Math.round((rows.filter(r => r.status.includes('✅')).length / allRooms.length) * 100);
+      const progressBar = document.getElementById('completion-bar');
+      progressBar.style.width = `${percentComplete}%`;
+      progressBar.textContent = `${percentComplete}%`;
+
+      const tbody = document.querySelector('#status-table tbody');
+
+      function renderTable(filteredRows) {
+        tbody.innerHTML = '';
+        filteredRows.forEach(row => {
+          const tr = document.createElement('tr');
+          tr.innerHTML = `
+            <td>${row.room}</td>
+            <td class="${row.status.includes('✅') ? 'status-ok' : 'status-missing'}">${row.status}</td>
+            <td>${row.lastDate}</td>
+            <td>${row.count}</td>
+            <td>${row.completedBy}</td>
+          `;
+          tbody.appendChild(tr);
+        });
+      }
+
+      let currentSortKey = null;
+      let sortAsc = true;
+
+      document.querySelectorAll('th').forEach(th => {
+        th.addEventListener('click', () => {
+          const key = th.dataset.key;
+          sortAsc = (key === currentSortKey) ? !sortAsc : true;
+          currentSortKey = key;
+
+          const sorted = [...rows].sort((a, b) => {
+            if (a[key] < b[key]) return sortAsc ? -1 : 1;
+            if (a[key] > b[key]) return sortAsc ? 1 : -1;
+            return 0;
+          });
+          renderTable(sorted);
+        });
+      });
+
+      function applyFilters() {
+        const query = document.getElementById('filter').value.toLowerCase();
+        const filtered = rows.filter(r =>
+          r.room.toLowerCase().includes(query) ||
+          r.completedBy.toLowerCase().includes(query)
+        );
+        renderTable(filtered);
+      }
+
+      document.getElementById('filter').addEventListener('input', applyFilters);
+
+      const urlRoom = getUrlParam('room');
+      const urlBy = getUrlParam('by');
+      if (urlRoom) document.getElementById('filter').value = urlRoom;
+      else if (urlBy) document.getElementById('filter').value = urlBy;
+
+      applyFilters();
+    }
+
+    main().catch(err => {
+      console.error(err);
+      document.body.insertAdjacentHTML('beforeend', '<p style="color:red;">Error loading data</p>');
+    });
+  </script>
+</body>
+</html>
