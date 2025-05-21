@@ -2,138 +2,155 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Organized Room Cleaning Shifts (4 Hours Each)</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Room Cleaning Shifts with Priority Demotion and Last Completed</title>
   <style>
     body {
       font-family: Arial, sans-serif;
-      margin: 20px;
+      margin: 2em;
     }
     h1 {
       text-align: center;
     }
     .shift {
       border: 1px solid #ccc;
-      border-radius: 10px;
-      margin: 20px auto;
-      padding: 10px 20px;
-      max-width: 800px;
+      border-radius: 8px;
+      padding: 1em;
+      margin-bottom: 1em;
       background-color: #f9f9f9;
     }
-    .room {
-      margin: 4px 0;
+    .shift h2 {
+      margin-top: 0;
     }
-    .bold {
-      font-weight: bold;
-    }
-    .priority-label {
-      font-size: 0.9em;
-      color: #555;
+    ul {
+      padding-left: 1.2em;
     }
   </style>
 </head>
 <body>
   <h1>Organized Room Cleaning Shifts (4 Hours Each)</h1>
-  <div id="shifts-container"></div>
+  <div id="shift-container"></div>
 
   <script>
-    async function fetchRoomData() {
-      const [roomRes, jotformRes, calendarRes] = await Promise.all([
-        fetch('rooms-shifts.csv').then(r => r.text()),
-        fetch('https://api.jotform.com/form/250955404825056/submissions?apiKey=5b9a10e2092947d49dac84004ad149a2').then(r => r.json()),
-        fetch('https://api.planningcenteronline.com/calendar/v2/calendars/46885/event_instances', {
-          headers: {
-            'Authorization': 'Bearer 2000d9a797cde02a3a2a2a5b02078c762db7a2300232b7f806e7f5be9bb1be22'
-          }
-        }).then(r => r.json())
-      ]);
+    const apiKey = '5b9a10e2092947d49dac84004ad149a2';
+    const formId = '250955404825056';
+    const roomFieldId = '18';
 
-      const lines = roomRes.trim().split('\n');
-      const roomHeaders = lines[0].split(',');
-      const roomData = lines.slice(1).map(l => {
-        const [name, priority, minutes] = l.split(',');
-        return { name: name.trim(), priority: parseInt(priority), minutes: parseInt(minutes), lastCompletedDays: null, usedDaysAgo: [], usedSoon: false };
+    // Helper: get current week Monday and Sunday
+    function getWeekBounds() {
+      const now = new Date();
+      const day = now.getDay();
+      const diffToMonday = (day === 0) ? -6 : 1 - day;
+      const monday = new Date(now);
+      monday.setHours(0, 0, 0, 0);
+      monday.setDate(now.getDate() + diffToMonday);
+
+      const sunday = new Date(monday);
+      sunday.setDate(monday.getDate() + 6);
+      sunday.setHours(23, 59, 59, 999);
+
+      return { monday, sunday };
+    }
+
+    function daysAgo(dateString) {
+      const submitted = new Date(dateString);
+      const now = new Date();
+      const diffMs = now - submitted;
+      return Math.floor(diffMs / (1000 * 60 * 60 * 24));
+    }
+
+    async function loadAndAssignShifts() {
+      // Fetch completed submissions
+      const { monday, sunday } = getWeekBounds();
+      const startISO = monday.toISOString();
+      const endISO = sunday.toISOString();
+
+      let submissions = [];
+      try {
+        const res = await fetch(`https://api.jotform.com/form/${formId}/submissions?apiKey=${apiKey}&filter[created_at][from]=${startISO}&filter[created_at][to]=${endISO}&limit=1000`);
+        const data = await res.json();
+        submissions = data.content || [];
+      } catch(e) {
+        console.error('Error fetching JotForm submissions', e);
+      }
+
+      // Map: roomName -> most recent submission date
+      const roomLastCompleted = new Map();
+      submissions.forEach(sub => {
+        const roomName = sub.answers?.[roomFieldId]?.answer?.trim();
+        if (roomName) {
+          const createdAt = new Date(sub.created_at);
+          if (!roomLastCompleted.has(roomName) || createdAt > roomLastCompleted.get(roomName)) {
+            roomLastCompleted.set(roomName, createdAt);
+          }
+        }
       });
 
-      const submissions = jotformRes.content || [];
-      const roomFieldId = '18';
-      const now = new Date();
-      const weekStart = new Date(now);
-      weekStart.setDate(now.getDate() - now.getDay() + 1);
-      weekStart.setHours(0,0,0,0);
+      // Fetch rooms.csv
+      const response = await fetch('rooms-shifts.csv');
+      const csvText = await response.text();
 
-      for (const room of roomData) {
-        const relevantSubs = submissions.filter(sub => {
-          const date = new Date(sub.created_at);
-          const answer = sub.answers?.[roomFieldId]?.answer?.trim();
-          return answer === room.name && date >= weekStart && date <= now;
-        });
-        if (relevantSubs.length > 0) {
-          const lastDate = new Date(relevantSubs.map(s => s.created_at).sort().reverse()[0]);
-          const daysAgo = Math.floor((now - lastDate) / (1000 * 60 * 60 * 24));
-          room.priority += 4;
-          room.lastCompletedDays = daysAgo;
+      const lines = csvText.trim().split('\n');
+      const dataLines = lines.slice(1); // skip header
+
+      // Parse rooms, demote priority by 4 if completed
+      const rooms = dataLines.map(line => {
+        const [name, priorityStr, timeStr] = line.split(',').map(s => s.trim());
+        let priority = parseInt(priorityStr);
+        const time = parseInt(timeStr);
+        if (roomLastCompleted.has(name)) {
+          priority += 4;  // demote priority
         }
-      }
+        return { name, priority, time };
+      }).filter(r => r.name && !isNaN(r.priority) && !isNaN(r.time));
 
-      const events = calendarRes.data || [];
-      for (const event of events) {
-        const start = new Date(event.attributes.starts_at);
-        const name = event.attributes.title;
-        for (const room of roomData) {
-          if (name.toLowerCase().includes(room.name.toLowerCase())) {
-            const daysDiff = Math.floor((now - start) / (1000 * 60 * 60 * 24));
-            if (start > now && start < new Date(now.getTime() + 2 * 24 * 60 * 60 * 1000)) {
-              room.usedSoon = true;
-            }
-            if (daysDiff >= 1) {
-              room.priority -= daysDiff;
-              room.usedDaysAgo.push(daysDiff);
-            }
-          }
-        }
-      }
+      // Sort by priority ascending, then time descending
+      rooms.sort((a, b) => a.priority - b.priority || b.time - a.time);
 
-      roomData.sort((a, b) => a.priority - b.priority);
-
+      // Group into shifts of max 240 minutes
       const shifts = [];
-      let currentShift = { rooms: [], total: 0, assignee: '' };
-      const assignees = ['Garrett', 'Thomas'];
-      let assigneeIndex = 0;
+      let currentShift = [];
+      let currentTime = 0;
+      const MAX_SHIFT_MINUTES = 240;
 
-      for (const room of roomData) {
-        if (currentShift.total + room.minutes > 240) {
-          currentShift.assignee = assignees[assigneeIndex % assignees.length];
+      for (const room of rooms) {
+        if (currentTime + room.time > MAX_SHIFT_MINUTES && currentShift.length > 0) {
           shifts.push(currentShift);
-          currentShift = { rooms: [], total: 0, assignee: '' };
-          assigneeIndex++;
+          currentShift = [];
+          currentTime = 0;
         }
-        currentShift.rooms.push(room);
-        currentShift.total += room.minutes;
+        currentShift.push(room);
+        currentTime += room.time;
       }
-      if (currentShift.rooms.length > 0) {
-        currentShift.assignee = assignees[assigneeIndex % assignees.length];
-        shifts.push(currentShift);
-      }
+      if (currentShift.length > 0) shifts.push(currentShift);
 
-      const container = document.getElementById('shifts-container');
-      shifts.forEach((shift, idx) => {
+      // Assign shifts alternating Garrett and Thomas
+      const people = ['Garrett', 'Thomas'];
+      const shiftContainer = document.getElementById('shift-container');
+      shiftContainer.innerHTML = '';
+
+      shifts.forEach((shift, i) => {
+        const assignedTo = people[i % people.length];
+        const totalTime = shift.reduce((sum, room) => sum + room.time, 0);
+
+        const ulHTML = shift.map(room => {
+          let lastCompletedStr = '';
+          if (roomLastCompleted.has(room.name)) {
+            const lastDate = roomLastCompleted.get(room.name);
+            const days = daysAgo(lastDate);
+            lastCompletedStr = ` (last completed: ${days} day${days !== 1 ? 's' : ''} ago)`;
+          }
+          return `<li>${room.name}${lastCompletedStr} - Priority ${room.priority}, ${room.time} min</li>`;
+        }).join('');
+
         const div = document.createElement('div');
         div.className = 'shift';
-        div.innerHTML = `<h2>Shift ${idx + 1} - Assigned to: ${shift.assignee} (Total: ${shift.total} min)</h2>`;
-        shift.rooms.forEach(room => {
-          const boldClass = room.usedSoon ? 'bold' : '';
-          const daysText = room.lastCompletedDays !== null ? ` (last completed: ${room.lastCompletedDays} day${room.lastCompletedDays === 1 ? '' : 's'} ago)` : '';
-          div.innerHTML += `<div class="room ${boldClass}">${room.name} <span class="priority-label">- Priority ${room.priority}, ${room.minutes} min${daysText}</span></div>`;
-        });
-        container.appendChild(div);
+        div.innerHTML = `<h2>Shift ${i + 1} - Assigned to: ${assignedTo} (Total: ${totalTime} min)</h2><ul>${ulHTML}</ul>`;
+        shiftContainer.appendChild(div);
       });
     }
 
-    fetchRoomData().catch(err => {
-      console.error(err);
-      document.body.insertAdjacentHTML('beforeend', '<p style="color:red;">Error loading shift data</p>');
-    });
+    loadAndAssignShifts();
   </script>
 </body>
 </html>
