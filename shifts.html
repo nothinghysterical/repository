@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Room Cleaning Shifts with Priority Demotion</title>
+  <title>Room Cleaning Shifts with Priority Demotion and Last Completed</title>
   <style>
     body {
       font-family: Arial, sans-serif;
@@ -52,13 +52,19 @@
       return { monday, sunday };
     }
 
+    function daysAgo(dateString) {
+      const submitted = new Date(dateString);
+      const now = new Date();
+      const diffMs = now - submitted;
+      return Math.floor(diffMs / (1000 * 60 * 60 * 24));
+    }
+
     async function loadAndAssignShifts() {
       // Fetch completed submissions
       const { monday, sunday } = getWeekBounds();
       const startISO = monday.toISOString();
       const endISO = sunday.toISOString();
 
-      // Fetch submissions from JotForm API for this week
       let submissions = [];
       try {
         const res = await fetch(`https://api.jotform.com/form/${formId}/submissions?apiKey=${apiKey}&filter[created_at][from]=${startISO}&filter[created_at][to]=${endISO}&limit=1000`);
@@ -68,11 +74,16 @@
         console.error('Error fetching JotForm submissions', e);
       }
 
-      // Extract completed rooms from submissions
-      const completedRoomsSet = new Set();
+      // Map: roomName -> most recent submission date
+      const roomLastCompleted = new Map();
       submissions.forEach(sub => {
         const roomName = sub.answers?.[roomFieldId]?.answer?.trim();
-        if (roomName) completedRoomsSet.add(roomName);
+        if (roomName) {
+          const createdAt = new Date(sub.created_at);
+          if (!roomLastCompleted.has(roomName) || createdAt > roomLastCompleted.get(roomName)) {
+            roomLastCompleted.set(roomName, createdAt);
+          }
+        }
       });
 
       // Fetch rooms.csv
@@ -87,13 +98,13 @@
         const [name, priorityStr, timeStr] = line.split(',').map(s => s.trim());
         let priority = parseInt(priorityStr);
         const time = parseInt(timeStr);
-        if (completedRoomsSet.has(name)) {
-          priority += 4;  // demote priority by adding 4
+        if (roomLastCompleted.has(name)) {
+          priority += 4;  // demote priority
         }
         return { name, priority, time };
       }).filter(r => r.name && !isNaN(r.priority) && !isNaN(r.time));
 
-      // Sort by priority ascending (lower number = higher priority), then time descending
+      // Sort by priority ascending, then time descending
       rooms.sort((a, b) => a.priority - b.priority || b.time - a.time);
 
       // Group into shifts of max 240 minutes
@@ -113,7 +124,7 @@
       }
       if (currentShift.length > 0) shifts.push(currentShift);
 
-      // Assign shifts to people alternating
+      // Assign shifts alternating Garrett and Thomas
       const people = ['Garrett', 'Thomas'];
       const shiftContainer = document.getElementById('shift-container');
       shiftContainer.innerHTML = '';
@@ -122,11 +133,19 @@
         const assignedTo = people[i % people.length];
         const totalTime = shift.reduce((sum, room) => sum + room.time, 0);
 
+        const ulHTML = shift.map(room => {
+          let lastCompletedStr = '';
+          if (roomLastCompleted.has(room.name)) {
+            const lastDate = roomLastCompleted.get(room.name);
+            const days = daysAgo(lastDate);
+            lastCompletedStr = ` (last completed: ${days} day${days !== 1 ? 's' : ''} ago)`;
+          }
+          return `<li>${room.name}${lastCompletedStr} - Priority ${room.priority}, ${room.time} min</li>`;
+        }).join('');
+
         const div = document.createElement('div');
         div.className = 'shift';
-        div.innerHTML = `<h2>Shift ${i + 1} - Assigned to: ${assignedTo} (Total: ${totalTime} min)</h2><ul>` +
-          shift.map(room => `<li>${room.name} - Priority ${room.priority}, ${room.time} min</li>`).join('') +
-          `</ul>`;
+        div.innerHTML = `<h2>Shift ${i + 1} - Assigned to: ${assignedTo} (Total: ${totalTime} min)</h2><ul>${ulHTML}</ul>`;
         shiftContainer.appendChild(div);
       });
     }
