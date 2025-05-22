@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <title>Cleaning Tasks for Today</title>
+  <title>Cleaning Tasks for Today (and Overdue)</title>
   <style>
     body {
       font-family: Arial, sans-serif;
@@ -19,8 +19,7 @@
 </head>
 <body>
   <h1>Cleaning Tasks for Today (and Overdue)</h1>
-  <input type="file" id="csvInput" accept=".csv" />
-  <div id="results"></div>
+  <div id="results">Loading tasks...</div>
 
   <script>
     const today = new Date();
@@ -56,10 +55,10 @@
 
     function handleCSV(content) {
       const lines = content.trim().split(/\r?\n/);
-      const header = lines.shift(); // skip header
+      const header = lines.shift();
 
       const tasksByPerson = {};
-      const roomLastCompleted = new Map(); // Simulate with empty Map unless provided
+      const roomLastCompleted = new Map(); // You can pre-fill this if needed
 
       lines.forEach(line => {
         const parts = line.split(',').map(p => p.trim());
@@ -74,13 +73,10 @@
         if (!room || isNaN(priority) || isNaN(time) || !dayName) return;
 
         const scheduledDate = getDateThisWeek(dayName);
-        if (scheduledDate > today) return; // future task
+        if (scheduledDate > today) return; // skip future tasks
 
-        let adjustedPriority = priority;
-        const lastCompleted = roomLastCompleted.get(room);
-        if (lastCompleted) {
-          adjustedPriority += 4;
-        }
+        const lastCompleted = roomLastCompleted.get(room); // default to undefined
+        const adjustedPriority = lastCompleted ? priority + 4 : priority;
 
         const task = {
           name: room,
@@ -103,21 +99,20 @@
       container.innerHTML = "";
 
       Object.entries(tasksByPerson).forEach(([person, tasks]) => {
-        const header = document.createElement("h2");
-        header.textContent = `${person} – Total: ${tasks.reduce((a, b) => a + b.time, 0)} min`;
-        container.appendChild(header);
+        const totalTime = tasks.reduce((sum, t) => sum + t.time, 0);
+        const h2 = document.createElement("h2");
+        h2.textContent = `${person} – Total: ${totalTime} min`;
+        container.appendChild(h2);
 
         const ul = document.createElement("ul");
         tasks
           .sort((a, b) => b.priority - a.priority)
           .forEach(task => {
             const li = document.createElement("li");
-            const isLate = task.lastCompleted == null;
-            if (isLate) li.classList.add("late");
-
             const lastCompletedText = task.lastCompleted
               ? `(last completed: ${formatDateDiff(task.lastCompleted)})`
               : "";
+            if (!task.lastCompleted) li.classList.add("late");
 
             li.textContent = `${task.name} ${lastCompletedText} – Priority ${task.priority}, ${task.time} min (Scheduled: ${task.day})`;
             ul.appendChild(li);
@@ -127,15 +122,16 @@
       });
     }
 
-    document.getElementById("csvInput").addEventListener("change", function (event) {
-      const file = event.target.files[0];
-      if (!file) return;
-      const reader = new FileReader();
-      reader.onload = () => {
-        handleCSV(reader.result);
-      };
-      reader.readAsText(file);
-    });
+    // Load CSV from root folder automatically
+    fetch('rooms-shifts.csv')
+      .then(response => {
+        if (!response.ok) throw new Error('CSV load failed');
+        return response.text();
+      })
+      .then(handleCSV)
+      .catch(error => {
+        document.getElementById("results").textContent = `Error: ${error.message}`;
+      });
   </script>
 </body>
 </html>
