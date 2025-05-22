@@ -193,6 +193,25 @@
       progressBar.style.width = `${percentComplete}%`;
       progressBar.textContent = `${percentComplete}%`;
 
+      if (percentComplete === 100) {
+  fetch('https://prod-155.westus.logic.azure.com:443/workflows/f977d3d1831a40ba82d5e6c0861eb84c/triggers/manual/paths/invoke?api-version=2016-06-01', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+      message: 'Room check-ins are 100% complete!',
+      percent: percentComplete
+    })
+  })
+  .then(res => {
+    if (!res.ok) throw new Error('Power Automate request failed');
+    console.log('Notification sent via Power Automate');
+  })
+  .catch(console.error);
+}
+
+
       const tbody = document.querySelector('#status-table tbody');
 
       function renderTable(filteredRows) {
