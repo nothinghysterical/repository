@@ -1,62 +1,101 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
-  <meta charset="UTF-8" />
-  <title>Cleaning Task Summary</title>
+  <title>Room Cleaning Schedule</title>
   <style>
     body {
       font-family: Arial, sans-serif;
-      line-height: 1.5;
-      background-color: #f4f4f4;
       padding: 20px;
     }
     h2 {
-      background-color: #333;
-      color: #fff;
-      padding: 10px;
+      border-bottom: 2px solid #444;
+      margin-top: 40px;
     }
     h3 {
-      color: #444;
       margin-top: 20px;
-      margin-bottom: 5px;
-      border-bottom: 1px solid #ccc;
     }
     ul {
-      background-color: #fff;
-      padding: 10px 15px;
-      border: 1px solid #ccc;
-      list-style: disc inside;
-      margin: 0 0 20px 0;
+      margin-left: 20px;
     }
-    li {
-      padding: 5px 0;
+    .person-section {
+      margin-bottom: 40px;
     }
   </style>
 </head>
 <body>
+  <h1>Room Cleaning Tasks</h1>
+  <div id="schedule"></div>
 
-  <h2>Cleaning Tasks for Thursday, May 22, 2025</h2>
+  <script>
+    // Simulated CSV rows (replace this array with data loaded via fetch or server-side)
+    const rooms = [
+      { Room: "Room 101", Day: "Monday", Assigned: "A", LastCompleted: "2025-05-19" },
+      { Room: "Room 102", Day: "Tuesday", Assigned: "A", LastCompleted: "" },
+      { Room: "Room 103", Day: "Wednesday", Assigned: "A", LastCompleted: "" },
+      { Room: "Room 104", Day: "Thursday", Assigned: "A", LastCompleted: "" },
+      { Room: "Room 105", Day: "Friday", Assigned: "A", LastCompleted: "" },
+      { Room: "Room 201", Day: "Wednesday", Assigned: "B", LastCompleted: "" },
+      { Room: "Room 202", Day: "Thursday", Assigned: "B", LastCompleted: "" },
+      { Room: "Room 203", Day: "Monday", Assigned: "B", LastCompleted: "2025-05-20" },
+      { Room: "Room 204", Day: "Tuesday", Assigned: "B", LastCompleted: "" },
+    ];
 
-  <h3>Alice – Due Today</h3>
-  <ul>
-    <li>Room 103</li>
-  </ul>
+    const scheduleDiv = document.getElementById('schedule');
+    const today = new Date("2025-05-22"); // Simulate Thursday
+    const todayDayName = today.toLocaleString('en-us', { weekday: 'long' });
+    const todayIndex = today.getDay(); // Sunday = 0
+    const prevMonday = new Date(today);
+    prevMonday.setDate(today.getDate() - ((todayIndex + 6) % 7)); // last Monday
 
-  <h3>Alice – Overdue</h3>
-  <ul>
-    <li>Room 102</li>
-    <li>Room 104</li>
-  </ul>
+    const daysIndex = { Sunday: 0, Monday: 1, Tuesday: 2, Wednesday: 3, Thursday: 4, Friday: 5, Saturday: 6 };
 
-  <h3>Bob – Due Today</h3>
-  <ul>
-    <li>Room 108</li>
-  </ul>
+    const byPerson = {};
 
-  <h3>Bob – Overdue</h3>
-  <ul>
-    <li>Room 107</li>
-  </ul>
+    for (const room of rooms) {
+      const assigned = room.Assigned;
+      const dayIndex = daysIndex[room.Day];
+      const lastCompleted = room.LastCompleted ? new Date(room.LastCompleted) : null;
 
+      if (!byPerson[assigned]) {
+        byPerson[assigned] = { dueToday: [], overdue: [] };
+      }
+
+      if (dayIndex === today.getDay()) {
+        byPerson[assigned].dueToday.push(room.Room);
+      } else if (
+        dayIndex < today.getDay() && // earlier in the week
+        (!lastCompleted || lastCompleted < prevMonday)
+      ) {
+        byPerson[assigned].overdue.push(room.Room);
+      }
+    }
+
+    for (const person of Object.keys(byPerson)) {
+      const section = document.createElement('div');
+      section.className = 'person-section';
+
+      section.innerHTML = `<h2>Assigned to ${person}</h2>`;
+
+      // Due Today
+      const dueToday = byPerson[person].dueToday;
+      section.innerHTML += `<h3>Due Today (${todayDayName})</h3>`;
+      if (dueToday.length) {
+        section.innerHTML += `<ul>${dueToday.map(r => `<li>${r}</li>`).join('')}</ul>`;
+      } else {
+        section.innerHTML += `<p>No rooms due today.</p>`;
+      }
+
+      // Overdue
+      const overdue = byPerson[person].overdue;
+      section.innerHTML += `<h3>Overdue (from earlier this week)</h3>`;
+      if (overdue.length) {
+        section.innerHTML += `<ul>${overdue.map(r => `<li>${r}</li>`).join('')}</ul>`;
+      } else {
+        section.innerHTML += `<p>No overdue rooms.</p>`;
+      }
+
+      scheduleDiv.appendChild(section);
+    }
+  </script>
 </body>
 </html>
