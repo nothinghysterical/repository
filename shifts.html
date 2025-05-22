@@ -2,216 +2,208 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>Room Assignments and JotForm Submissions</title>
+<title>Room Assignments for A</title>
 <style>
-  body { font-family: Arial, sans-serif; max-width: 900px; margin: auto; padding: 1rem; }
-  h2 { border-bottom: 2px solid #ccc; padding-bottom: 0.25rem; }
-  section { margin-bottom: 2rem; }
-  ul { list-style: none; padding-left: 0; }
-  li { padding: 0.25rem 0; }
-  .completed { color: green; }
-  .overdue { color: red; }
+  body { font-family: Arial, sans-serif; margin: 20px; }
+  h2 { margin-top: 30px; }
+  ul { list-style-type: disc; margin-left: 20px; }
+  a { color: blue; text-decoration: underline; }
 </style>
 </head>
 <body>
-<h1>Room Assignments and Submissions</h1>
+  <h1>Room Assignments for A</h1>
 
-<div id="content">Loading data...</div>
+  <h2>Due Today</h2>
+  <ul id="dueToday"></ul>
+
+  <h2>Overdue</h2>
+  <ul id="overdue"></ul>
+
+  <div id="additionalItems"></div>
 
 <script>
-// Configs
-const API_KEY = '5b9a10e2092947d49dac84004ad149a2';
-const ROOM_FORM_ID = '250955404825056';
-const ROOM_FIELD_ID = '18';
-const BRIAN_FORM_ID = '251415718602049';
-const STATUS_FIELD_ID = '9';
-const ASSIGNED_TO_FIELD_ID = '10';
-const BRIAN_NAME = 'Brian';
+(async () => {
+  const assignedName = 'A'; // person to filter on
 
-// Utility: Parse CSV from fetch text
-function parseCSV(text) {
-  const lines = text.trim().split('\n');
-  const headers = lines.shift().split(',');
-  return lines.map(line => {
-    const cols = line.split(',');
-    let obj = {};
-    headers.forEach((h,i) => obj[h.trim()] = cols[i].trim());
-    return obj;
-  });
-}
+  // JotForm API keys and forms
+  const apiKey = '5b9a10e2092947d49dac84004ad149a2';
+  const cleaningFormId = '250955404825056';
+  const ticketsFormId = '251415718602049';
 
-// Utility: Get previous Monday from today
-function getPreviousMonday() {
+  // Field IDs in tickets form (from your data)
+  const statusFieldId = '9';
+  const assignedToFieldId = '10';
+  const describeFieldId = '6';
+
+  // Get date helpers
   const now = new Date();
-  const day = now.getDay();
-  const diff = (day === 1) ? 0 : (day + 6) % 7; // days since previous Monday
-  now.setHours(0,0,0,0);
-  now.setDate(now.getDate() - diff);
-  return now;
-}
+  const dayNames = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
 
-// Fetch CSV and parse
-async function loadCSV() {
-  const res = await fetch('./rooms-shifts.csv');
-  const text = await res.text();
-  return parseCSV(text);
-}
-
-// JotForm API fetch helper with pagination support if needed
-async function fetchJotFormSubmissions(formId) {
-  const url = `https://api.jotform.com/form/${formId}/submissions?apiKey=${API_KEY}&limit=1000`;
-  const res = await fetch(url);
-  const json = await res.json();
-  if(json.responseCode !== 200) throw new Error('Failed fetching submissions for form ' + formId);
-  return json.content;
-}
-
-// Decode option keys in submission answers (like {key})
-function decodeOptionValue(field, key) {
-  if(!field || !field.options_array) return null;
-  try {
-    const opts = JSON.parse(field.options_array);
-    return opts[key]?.value || null;
-  } catch {
-    return null;
+  // Get last Monday date
+  function getLastMonday(date) {
+    const d = new Date(date);
+    const day = d.getDay();
+    const diff = (day === 1) ? 0 : (day === 0 ? 6 : day - 1);
+    d.setDate(d.getDate() - diff);
+    d.setHours(0,0,0,0);
+    return d;
   }
-}
 
-// Main render function
-async function main() {
-  const content = document.getElementById('content');
-  content.textContent = 'Loading rooms data...';
-  const rooms = await loadCSV();
+  const lastMonday = getLastMonday(now);
 
-  content.textContent = 'Loading room form submissions...';
-  const roomSubmissions = await fetchJotFormSubmissions(ROOM_FORM_ID);
+  // Load CSV file from root folder
+  async function loadCSV() {
+    const res = await fetch('rooms-shifts.csv');
+    const text = await res.text();
+    return text.split('\n')
+      .filter(line => line.trim() !== '')
+      .map(line => {
+        const [Room, Campus, Priority, Time, Assigned, Day] = line.split(',');
+        return { Room, Campus, Priority, Time, Assigned, Day };
+      });
+  }
 
-  content.textContent = 'Loading Brian form submissions...';
-  const brianSubmissions = await fetchJotFormSubmissions(BRIAN_FORM_ID);
+  // Fetch submissions from JotForm with pagination support
+  async function fetchAllSubmissions(formId) {
+    let submissions = [];
+    let offset = 0;
+    const limit = 100;
+    while (true) {
+      const res = await fetch(`https://api.jotform.com/form/${formId}/submissions?apiKey=${apiKey}&limit=${limit}&offset=${offset}`);
+      const data = await res.json();
+      if (!data.content || data.content.length === 0) break;
+      submissions = submissions.concat(data.content);
+      if (data.content.length < limit) break;
+      offset += limit;
+    }
+    return submissions;
+  }
 
-  // Compute previous Monday datetime for filtering
-  const prevMonday = getPreviousMonday();
-
-  // Filter room form submissions completed since previous Monday
-  // Rooms completed = those with matching room field answer and created_at >= prevMonday
-  const completedRoomsSet = new Set();
-  for (const sub of roomSubmissions) {
-    const created = new Date(sub.created_at);
-    if (created >= prevMonday) {
-      const answers = sub.answers || {};
-      const roomAnswer = answers[ROOM_FIELD_ID]?.answer;
-      if(roomAnswer) {
-        completedRoomsSet.add(roomAnswer);
-      }
+  // Decode option keys for tickets form fields
+  function decodeOption(field, key) {
+    if (!field.options_array) return null;
+    try {
+      const opts = JSON.parse(field.options_array);
+      return opts[key]?.value || null;
+    } catch {
+      return null;
     }
   }
 
-  // Group rooms by Assigned and Day
-  const roomsByAssigned = {};
-  for(const room of rooms) {
-    if(!roomsByAssigned[room.Assigned]) roomsByAssigned[room.Assigned] = [];
-    roomsByAssigned[room.Assigned].push(room);
+  // Fetch cleaning form submissions to check completion
+  const cleaningSubs = await fetchAllSubmissions(cleaningFormId);
+
+  // Filter rooms assigned to person & day
+  const csvData = await loadCSV();
+
+  // Helper to check if submission is completed for a room since last Monday
+  function isRoomCompleted(roomName) {
+    // Any cleaning submission with roomFieldId == roomName and created_at >= lastMonday
+    return cleaningSubs.some(sub => {
+      const created = new Date(sub.created_at);
+      if (created < lastMonday) return false;
+      const answers = sub.answers || {};
+      for (const key in answers) {
+        if (answers[key].name === 'room' && answers[key].answer === roomName) {
+          return true;
+        }
+      }
+      return false;
+    });
   }
 
-  // Decode Brian form assigned and status answers helper
-  function isBrianAssignedAndNotCompleted(sub) {
-    const answers = sub.answers || {};
-    const statusField = answers[STATUS_FIELD_ID];
-    const assignedField = answers[ASSIGNED_TO_FIELD_ID];
-    if(!statusField || !assignedField) return false;
+  // Get today's day name
+  const todayName = dayNames[now.getDay()];
 
-    const statusKey = statusField.answer.replace(/[{}]/g,'');
-    const assignedKeys = Array.isArray(assignedField.answer) ? assignedField.answer : [assignedField.answer];
-    const assignedKeyClean = assignedKeys.map(k => k.replace(/[{}]/g,''));
+  // Rooms assigned to 'A' for today
+  const assignedRoomsToday = csvData.filter(r => r.Assigned === assignedName && r.Day === todayName);
+  // Rooms assigned to 'A' before today but after last Monday (overdue)
+  const assignedRoomsOverdue = csvData.filter(r => r.Assigned === assignedName && dayNames.indexOf(r.Day) < dayNames.indexOf(todayName) && dayNames.indexOf(r.Day) >= dayNames.indexOf('Monday'));
 
-    const statusLabel = decodeOptionValue(statusField, statusKey);
-    const assignedLabels = assignedKeyClean.map(k => decodeOptionValue(assignedField, k));
+  // Filter rooms NOT completed
+  const dueTodayRooms = assignedRoomsToday.filter(r => !isRoomCompleted(r.Room));
+  const overdueRooms = assignedRoomsOverdue.filter(r => !isRoomCompleted(r.Room));
 
-    return assignedLabels.includes(BRIAN_NAME) && statusLabel !== 'Completed';
+  // Display rooms
+  const dueTodayElem = document.getElementById('dueToday');
+  const overdueElem = document.getElementById('overdue');
+
+  if (dueTodayRooms.length === 0) {
+    dueTodayElem.innerHTML = '<li>None</li>';
+  } else {
+    dueTodayRooms.forEach(r => {
+      const li = document.createElement('li');
+      li.textContent = r.Room;
+      dueTodayElem.appendChild(li);
+    });
   }
 
-  // Filter Brian submissions that are assigned to Brian and not completed
-  const filteredBrianSubs = brianSubmissions.filter(isBrianAssignedAndNotCompleted);
+  if (overdueRooms.length === 0) {
+    overdueElem.innerHTML = '<li>None</li>';
+  } else {
+    overdueRooms.forEach(r => {
+      const li = document.createElement('li');
+      li.textContent = r.Room;
+      overdueElem.appendChild(li);
+    });
+  }
 
-  // Build the HTML per Assigned person
-  let html = '';
+  // Check if all completed
+  const allCompleted = dueTodayRooms.length === 0 && overdueRooms.length === 0;
 
-  for(const assigned in roomsByAssigned) {
-    html += `<section><h2>${assigned}</h2>`;
+  const additionalDiv = document.getElementById('additionalItems');
 
-    const assignedRooms = roomsByAssigned[assigned];
-    // For simplicity, we assume today is Monday or filter by Day === today (optional)
-    // But the user example showed all on Monday, so let's filter rooms due today only by Day = current day string
-    const days = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
-    const todayStr = days[new Date().getDay()];
+  if (allCompleted) {
+    additionalDiv.innerHTML = '<h2>Check additional items below</h2>';
     
-    // Rooms due today (Day matches today) and not completed
-    const dueTodayRooms = assignedRooms.filter(r => r.Day === todayStr && !completedRoomsSet.has(r.Room));
-    // Rooms overdue (Day before today or previous Monday but not completed)
-    // Overdue means any room assigned that is not completed and whose Day < today? Let's define overdue as all rooms assigned with Day before today that are not completed
-    const overdueRooms = assignedRooms.filter(r => {
-      // Convert day name to number
-      const dayNum = days.indexOf(r.Day);
-      const todayNum = days.indexOf(todayStr);
-      return dayNum < todayNum && !completedRoomsSet.has(r.Room);
+    // Fetch tickets form submissions
+    const ticketsSubs = await fetchAllSubmissions(ticketsFormId);
+
+    // Filter tickets NOT Completed, assigned to anyone
+    const filteredTickets = ticketsSubs.filter(sub => {
+      const answers = sub.answers || {};
+      const statusField = answers[statusFieldId];
+      const assignedToField = answers[assignedToFieldId];
+      const describeField = answers[describeFieldId];
+
+      if (!statusField || !assignedToField || !describeField) return false;
+
+      // Decode status value key
+      const statusKey = statusField.answer.replace(/[{}]/g, '');
+      const statusLabel = decodeOption(statusField, statusKey);
+
+      // Decode assignedTo keys
+      const assignedKeys = Array.isArray(assignedToField.answer) ? assignedToField.answer : [assignedToField.answer];
+      const assignedLabels = assignedKeys.map(k => decodeOption(assignedToField, k.replace(/[{}]/g, ''))).filter(Boolean);
+
+      return statusLabel !== 'Completed';
     });
 
-    // Due Today Section
-    html += `<h3>Due today</h3>`;
-    if(dueTodayRooms.length === 0) {
-      html += `<p><em>None</em></p>`;
+    if (filteredTickets.length === 0) {
+      additionalDiv.innerHTML += '<p>No outstanding tickets.</p>';
     } else {
-      html += `<ul>`;
-      for(const room of dueTodayRooms) {
-        html += `<li>${room.Room}</li>`;
-      }
-      html += `</ul>`;
-    }
+      const ul = document.createElement('ul');
+      filteredTickets.forEach(sub => {
+        const answers = sub.answers || {};
+        const describeField = answers[describeFieldId];
+        const assignedToField = answers[assignedToFieldId];
 
-    // Add Brian's incomplete submissions at bottom of Due Today ONLY for Brian assigned
-    if(assigned.toLowerCase() === 'brian') {
-      html += `<h4>Brian's open submissions</h4>`;
-      if(filteredBrianSubs.length === 0) {
-        html += `<p><em>None</em></p>`;
-      } else {
-        html += `<ul>`;
-        for(const sub of filteredBrianSubs) {
-          const nameAnswer = sub.answers['3']?.prettyFormat || 'Unknown';
-          const desc = sub.answers['6']?.answer || '';
-          const createdAt = new Date(sub.created_at).toLocaleString();
-          html += `<li><strong>${nameAnswer}</strong>: ${desc} <br/><small>Submitted: ${createdAt}</small></li>`;
-        }
-        html += `</ul>`;
-      }
-    }
+        const describeText = describeField.answer || 'No Description';
+        const assignedKeys = Array.isArray(assignedToField.answer) ? assignedToField.answer : [assignedToField.answer];
+        const assignedLabels = assignedKeys.map(k => decodeOption(assignedToField, k.replace(/[{}]/g, ''))).filter(Boolean);
+        
+        // Link to submission
+        const subLink = `https://www.jotform.com/submission/${sub.id}`;
 
-    // Overdue Section
-    html += `<h3>Overdue</h3>`;
-    if(overdueRooms.length === 0) {
-      html += `<p><em>None</em></p>`;
-    } else {
-      html += `<ul>`;
-      for(const room of overdueRooms) {
-        html += `<li>${room.Room}</li>`;
-      }
-      html += `</ul>`;
+        const li = document.createElement('li');
+        li.innerHTML = `<a href="${subLink}" target="_blank">${describeText}</a> — Assigned to: ${assignedLabels.join(', ')}`;
+        ul.appendChild(li);
+      });
+      additionalDiv.appendChild(ul);
     }
-
-    // Show "See Brian for additional items" if all rooms complete
-    if(dueTodayRooms.length === 0 && overdueRooms.length === 0) {
-      html += `<p><strong>See Brian for additional items.</strong></p>`;
-    }
-
-    html += `</section>`;
   }
 
-  content.innerHTML = html;
-}
-
-main().catch(err => {
-  document.getElementById('content').textContent = 'Error loading data: ' + err.message;
-});
+})();
 </script>
 </body>
 </html>
