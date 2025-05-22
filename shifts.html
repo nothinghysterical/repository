@@ -60,7 +60,7 @@
       scheduleDiv.textContent = 'Loading...';
 
       try {
-        const res = await fetch('/rooms-shifts.csv');
+        const res = await fetch('rooms-shifts.csv');
         if (!res.ok) throw new Error(`HTTP error ${res.status}`);
         const csvText = await res.text();
 
