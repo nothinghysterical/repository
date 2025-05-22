@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Room Cleaning Shifts with Priority Demotion and Last Completed</title>
+  <title>Today's Cleaning Tasks by Person</title>
   <style>
     body {
       font-family: Arial, sans-serif;
@@ -12,14 +12,14 @@
     h1 {
       text-align: center;
     }
-    .shift {
+    .person {
       border: 1px solid #ccc;
       border-radius: 8px;
       padding: 1em;
       margin-bottom: 1em;
-      background-color: #f9f9f9;
+      background-color: #f0f8ff;
     }
-    .shift h2 {
+    .person h2 {
       margin-top: 0;
     }
     ul {
@@ -28,28 +28,34 @@
   </style>
 </head>
 <body>
-  <h1>Organized Room Cleaning Shifts (4 Hours Each)</h1>
-  <div id="shift-container"></div>
+  <h1>Cleaning Tasks for Today (and Overdue)</h1>
+  <div id="person-container"></div>
 
   <script>
     const apiKey = '5b9a10e2092947d49dac84004ad149a2';
     const formId = '250955404825056';
     const roomFieldId = '18';
 
-    // Helper: get current week Monday and Sunday
-    function getWeekBounds() {
+    const dayToIndex = {
+      Sunday: 0, Monday: 1, Tuesday: 2, Wednesday: 3, Thursday: 4, Friday: 5, Saturday: 6
+    };
+
+    function getWeekMonday() {
       const now = new Date();
       const day = now.getDay();
-      const diffToMonday = (day === 0) ? -6 : 1 - day;
+      const diff = (day === 0) ? -6 : 1 - day;
       const monday = new Date(now);
+      monday.setDate(now.getDate() + diff);
       monday.setHours(0, 0, 0, 0);
-      monday.setDate(now.getDate() + diffToMonday);
+      return monday;
+    }
 
-      const sunday = new Date(monday);
-      sunday.setDate(monday.getDate() + 6);
-      sunday.setHours(23, 59, 59, 999);
-
-      return { monday, sunday };
+    function getDateThisWeek(dayName) {
+      const monday = getWeekMonday();
+      const dayOffset = dayToIndex[dayName];
+      const date = new Date(monday);
+      date.setDate(monday.getDate() + dayOffset);
+      return date;
     }
 
     function daysAgo(dateString) {
@@ -59,22 +65,21 @@
       return Math.floor(diffMs / (1000 * 60 * 60 * 24));
     }
 
-    async function loadAndAssignShifts() {
-      // Fetch completed submissions
-      const { monday, sunday } = getWeekBounds();
-      const startISO = monday.toISOString();
-      const endISO = sunday.toISOString();
+    async function loadAndGroupByPerson() {
+      const monday = getWeekMonday();
+      const sunday = new Date(monday);
+      sunday.setDate(monday.getDate() + 6);
+      sunday.setHours(23, 59, 59, 999);
 
       let submissions = [];
       try {
-        const res = await fetch(`https://api.jotform.com/form/${formId}/submissions?apiKey=${apiKey}&filter[created_at][from]=${startISO}&filter[created_at][to]=${endISO}&limit=1000`);
+        const res = await fetch(`https://api.jotform.com/form/${formId}/submissions?apiKey=${apiKey}&filter[created_at][from]=${monday.toISOString()}&filter[created_at][to]=${sunday.toISOString()}&limit=1000`);
         const data = await res.json();
         submissions = data.content || [];
       } catch(e) {
         console.error('Error fetching JotForm submissions', e);
       }
 
-      // Map: roomName -> most recent submission date
       const roomLastCompleted = new Map();
       submissions.forEach(sub => {
         const roomName = sub.answers?.[roomFieldId]?.answer?.trim();
@@ -86,71 +91,67 @@
         }
       });
 
-      // Fetch rooms.csv
       const response = await fetch('rooms-shifts.csv');
       const csvText = await response.text();
 
       const lines = csvText.trim().split('\n');
-      const dataLines = lines.slice(1); // skip header
+      const dataLines = lines.slice(1);
 
-      // Parse rooms, demote priority by 4 if completed
-      const rooms = dataLines.map(line => {
-        const [name, priorityStr, timeStr] = line.split(',').map(s => s.trim());
-        let priority = parseInt(priorityStr);
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+
+      const tasksByPerson = {};
+
+      dataLines.forEach(line => {
+        const [name, campus, priorityStr, timeStr, assigned, dayName] = line.split(',').map(s => s.trim());
+        const priority = parseInt(priorityStr);
         const time = parseInt(timeStr);
+        const scheduledDate = getDateThisWeek(dayName);
+
+        if (scheduledDate > today) return; // skip future rooms
+
+        let adjustedPriority = priority;
         if (roomLastCompleted.has(name)) {
-          priority += 4;  // demote priority
+          adjustedPriority += 4;
         }
-        return { name, priority, time };
-      }).filter(r => r.name && !isNaN(r.priority) && !isNaN(r.time));
 
-      // Sort by priority ascending, then time descending
-      rooms.sort((a, b) => a.priority - b.priority || b.time - a.time);
+        const task = {
+          name,
+          priority: adjustedPriority,
+          originalPriority: priority,
+          time,
+          day: dayName,
+          lastCompleted: roomLastCompleted.get(name) || null
+        };
 
-      // Group into shifts of max 240 minutes
-      const shifts = [];
-      let currentShift = [];
-      let currentTime = 0;
-      const MAX_SHIFT_MINUTES = 240;
+        if (!tasksByPerson[assigned]) tasksByPerson[assigned] = [];
+        tasksByPerson[assigned].push(task);
+      });
 
-      for (const room of rooms) {
-        if (currentTime + room.time > MAX_SHIFT_MINUTES && currentShift.length > 0) {
-          shifts.push(currentShift);
-          currentShift = [];
-          currentTime = 0;
-        }
-        currentShift.push(room);
-        currentTime += room.time;
-      }
-      if (currentShift.length > 0) shifts.push(currentShift);
+      const container = document.getElementById('person-container');
+      container.innerHTML = '';
 
-      // Assign shifts alternating Garrett and Thomas
-      const people = ['Garrett', 'Thomas'];
-      const shiftContainer = document.getElementById('shift-container');
-      shiftContainer.innerHTML = '';
+      Object.entries(tasksByPerson).forEach(([person, tasks]) => {
+        tasks.sort((a, b) => a.priority - b.priority || b.time - a.time);
+        const totalTime = tasks.reduce((sum, t) => sum + t.time, 0);
 
-      shifts.forEach((shift, i) => {
-        const assignedTo = people[i % people.length];
-        const totalTime = shift.reduce((sum, room) => sum + room.time, 0);
-
-        const ulHTML = shift.map(room => {
-          let lastCompletedStr = '';
-          if (roomLastCompleted.has(room.name)) {
-            const lastDate = roomLastCompleted.get(room.name);
-            const days = daysAgo(lastDate);
-            lastCompletedStr = ` (last completed: ${days} day${days !== 1 ? 's' : ''} ago)`;
+        const ulHTML = tasks.map(task => {
+          let lastStr = '';
+          if (task.lastCompleted) {
+            const days = daysAgo(task.lastCompleted);
+            lastStr = ` (last completed: ${days} day${days !== 1 ? 's' : ''} ago)`;
           }
-          return `<li>${room.name}${lastCompletedStr} - Priority ${room.priority}, ${room.time} min</li>`;
+          return `<li>${task.name}${lastStr} – Priority ${task.priority}, ${task.time} min (Scheduled: ${task.day})</li>`;
         }).join('');
 
         const div = document.createElement('div');
-        div.className = 'shift';
-        div.innerHTML = `<h2>Shift ${i + 1} - Assigned to: ${assignedTo} (Total: ${totalTime} min)</h2><ul>${ulHTML}</ul>`;
-        shiftContainer.appendChild(div);
+        div.className = 'person';
+        div.innerHTML = `<h2>${person} – Total: ${totalTime} min</h2><ul>${ulHTML}</ul>`;
+        container.appendChild(div);
       });
     }
 
-    loadAndAssignShifts();
+    loadAndGroupByPerson();
   </script>
 </body>
 </html>
