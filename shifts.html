@@ -2,24 +2,52 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <title>Cleaning Tasks for Today (and Overdue)</title>
+  <title>Cleaning Tasks for Today</title>
   <style>
     body {
       font-family: Arial, sans-serif;
       padding: 1em;
-      background: #f9f9f9;
+      background: #f4f4f4;
+      color: #333;
+    }
+    h1 {
+      text-align: center;
     }
     h2 {
-      margin-top: 1.5em;
+      margin-top: 2em;
+      background: #222;
+      color: #fff;
+      padding: 0.5em;
+    }
+    h3 {
+      margin-top: 1em;
+      margin-bottom: 0.2em;
+      color: #444;
+      border-bottom: 1px solid #ccc;
+      padding-bottom: 0.2em;
+    }
+    ul {
+      list-style: none;
+      padding-left: 1em;
+    }
+    li {
+      margin-bottom: 0.4em;
     }
     .late {
       color: red;
     }
+    .section {
+      background: #fff;
+      padding: 1em;
+      border-radius: 6px;
+      box-shadow: 0 0 5px rgba(0,0,0,0.05);
+      margin-bottom: 2em;
+    }
   </style>
 </head>
 <body>
-  <h1>Cleaning Tasks for Today (and Overdue)</h1>
-  <div id="results">Loading tasks...</div>
+  <h1>Cleaning Tasks for Today</h1>
+  <div id="results">Loading...</div>
 
   <script>
     const today = new Date();
@@ -46,49 +74,56 @@
       return result;
     }
 
-    function formatDateDiff(lastDate) {
-      if (!lastDate) return "never";
-      const diffTime = today - new Date(lastDate);
-      const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+    function formatDateDiff(dateStr) {
+      if (!dateStr) return "never";
+      const date = new Date(dateStr);
+      const diffDays = Math.floor((today - date) / (1000 * 60 * 60 * 24));
       return `${diffDays} day${diffDays === 1 ? "" : "s"} ago`;
     }
 
     function handleCSV(content) {
       const lines = content.trim().split(/\r?\n/);
-      const header = lines.shift();
+      lines.shift(); // remove header
 
+      const roomLastCompleted = new Map(); // stub for completion data
       const tasksByPerson = {};
-      const roomLastCompleted = new Map(); // You can pre-fill this if needed
 
       lines.forEach(line => {
         const parts = line.split(',').map(p => p.trim());
         if (parts.length < 6) return;
 
         const [room, campus, priorityStr, timeStr, assignedRaw, dayNameRaw] = parts;
-        const priority = parseInt(priorityStr, 10);
-        const time = parseInt(timeStr, 10);
         const assigned = assignedRaw || "Unassigned";
-        const dayName = dayNameRaw;
+        const scheduledDay = dayNameRaw;
 
-        if (!room || isNaN(priority) || isNaN(time) || !dayName) return;
+        if (!room || !scheduledDay) return;
 
-        const scheduledDate = getDateThisWeek(dayName);
-        if (scheduledDate > today) return; // skip future tasks
-
-        const lastCompleted = roomLastCompleted.get(room); // default to undefined
-        const adjustedPriority = lastCompleted ? priority + 4 : priority;
+        const scheduledDate = getDateThisWeek(scheduledDay);
+        const lastCompleted = roomLastCompleted.get(room); // assume empty unless integrated
+        const lastDate = lastCompleted ? new Date(lastCompleted) : null;
 
         const task = {
-          name: room,
-          priority: adjustedPriority,
-          originalPriority: priority,
-          time,
-          day: dayName,
-          lastCompleted
+          room,
+          scheduledDay,
+          scheduledDate,
+          lastCompleted: lastDate
         };
 
-        if (!tasksByPerson[assigned]) tasksByPerson[assigned] = [];
-        tasksByPerson[assigned].push(task);
+        const status = !lastDate || lastDate < scheduledDate ? 
+                       (scheduledDate < today ? 'Overdue' : 'Due Today') : 
+                       null;
+
+        if (!status) return;
+
+        if (!tasksByPerson[assigned]) {
+          tasksByPerson[assigned] = { overdue: [], today: [] };
+        }
+
+        if (status === 'Overdue') {
+          tasksByPerson[assigned].overdue.push(task);
+        } else {
+          tasksByPerson[assigned].today.push(task);
+        }
       });
 
       renderResults(tasksByPerson);
@@ -98,39 +133,57 @@
       const container = document.getElementById("results");
       container.innerHTML = "";
 
-      Object.entries(tasksByPerson).forEach(([person, tasks]) => {
-        const totalTime = tasks.reduce((sum, t) => sum + t.time, 0);
-        const h2 = document.createElement("h2");
-        h2.textContent = `${person} – Total: ${totalTime} min`;
-        container.appendChild(h2);
+      Object.entries(tasksByPerson).forEach(([person, { today, overdue }]) => {
+        const section = document.createElement("div");
+        section.className = "section";
 
-        const ul = document.createElement("ul");
-        tasks
-          .sort((a, b) => b.priority - a.priority)
-          .forEach(task => {
+        const heading = document.createElement("h2");
+        heading.textContent = person;
+        section.appendChild(heading);
+
+        if (today.length > 0) {
+          const h3 = document.createElement("h3");
+          h3.textContent = "Due Today";
+          section.appendChild(h3);
+
+          const ul = document.createElement("ul");
+          today.forEach(task => {
             const li = document.createElement("li");
-            const lastCompletedText = task.lastCompleted
-              ? `(last completed: ${formatDateDiff(task.lastCompleted)})`
-              : "";
-            if (!task.lastCompleted) li.classList.add("late");
-
-            li.textContent = `${task.name} ${lastCompletedText} – Priority ${task.priority}, ${task.time} min (Scheduled: ${task.day})`;
+            const lastText = task.lastCompleted ? `(last completed: ${formatDateDiff(task.lastCompleted)})` : "(never completed)";
+            li.textContent = `${task.room} ${lastText}`;
             ul.appendChild(li);
           });
+          section.appendChild(ul);
+        }
 
-        container.appendChild(ul);
+        if (overdue.length > 0) {
+          const h3 = document.createElement("h3");
+          h3.textContent = "Overdue";
+          section.appendChild(h3);
+
+          const ul = document.createElement("ul");
+          overdue.forEach(task => {
+            const li = document.createElement("li");
+            li.classList.add("late");
+            const lastText = task.lastCompleted ? `(last completed: ${formatDateDiff(task.lastCompleted)})` : "(never completed)";
+            li.textContent = `${task.room} ${lastText}`;
+            ul.appendChild(li);
+          });
+          section.appendChild(ul);
+        }
+
+        container.appendChild(section);
       });
     }
 
-    // Load CSV from root folder automatically
     fetch('rooms-shifts.csv')
-      .then(response => {
-        if (!response.ok) throw new Error('CSV load failed');
-        return response.text();
+      .then(resp => {
+        if (!resp.ok) throw new Error("Could not load CSV.");
+        return resp.text();
       })
       .then(handleCSV)
-      .catch(error => {
-        document.getElementById("results").textContent = `Error: ${error.message}`;
+      .catch(err => {
+        document.getElementById("results").textContent = `Error: ${err.message}`;
       });
   </script>
 </body>
