@@ -1,70 +1,70 @@
-Room,Priority,Time
-Room 100,1,30
-Room 102,2,30
-Room 103,3,30
-Room 104,4,30
-Room 108-110,1,30
-Room 111,2,30
-Room 112,3,30
-Room 113,4,30
-Kitchen,1,60
-Room 118,2,30
-Bathroom 118,3,45
-Room 120,4,30
-Bathroom 92-1-1,1,45
-Bathroom 92-1-2,2,45
-Hallway 92-1,3,60
-Entrance E,4,30
-Stairwell E,1,30
-Stairwell B,2,30
-Hallway 92-2,3,60
-Worship Center,4,120
-Bathroom 92-2-1,1,45
-Bathroom 92-2-2,2,45
-Hallway 92-3,3,30
-Bathroom 92-3-1,4,45
-Bathroom 92-3-2,1,45
-Worship Center Balcony,2,60
-Stairwell C,3,30
-Stairwell D,4,30
-Hallway 72-1,1,30
-Bathroom 72-1-1,2,45
-Bathroom 72-1-2,3,45
-Room 124,4,30
-Room 127,1,30
-Room 130,2,30
-Stairwell F,3,30
-Entrance F,4,30
-Hallway 72-2,1,45
-Bathroom 72-2-1,2,45
-Bathroom 72-2-2,3,45
-Room Zone,4,120
-Bathroom Zone,1,30
-Kitchen 72-2,2,30
-Entrance A,3,45
-Room 220,4,30
-Hallway 72-3,1,45
-Bathroom 72-3-1,2,45
-Bathroom 72-3-2,3,45
-Room 320,4,30
-Room 323,1,30
-Room 326,2,30
-Room 328,3,30
-Room 330,4,60
-Room Office,1,60
-Hallway 25-1,2,30
-Bathroom 25-1-1,3,45
-Bathroom 25-1-2,4,45
-Kitchen Office,1,30
-Room Conf,2,30
-Room Meet 1,3,20
-Room Meet 2,4,20
-Room Meet 3,1,20
-Stairwell G,2,30
-Gym,3,60
-Hallway 25-2,4,30
-Bathroom 25-2-1,1,45
-Bathroom 25-2-2,2,45
-Room 250,3,30
-Room 254,4,30
-Gym Balcony,1,30
+﻿Room,Campus,Priority,Time,Assigned,Day
+Room 100,Colerain,1,30,A,Monday
+Room 102,Colerain,2,30,A,Monday
+Room 103,Colerain,3,30,A,Monday
+Room 104,Colerain,4,30,A,Monday
+Room 108-110,Colerain,1,30,A,Monday
+Room 111,Colerain,2,30,A,Monday
+Room 112,Colerain,3,30,A,Monday
+Room 113,Colerain,4,30,A,Monday
+Kitchen,Colerain,1,60,A,Monday
+Room 118,Colerain,2,30,A,Monday
+Bathroom 118,Colerain,3,45,A,Monday
+Room 120,Colerain,4,30,A,Monday
+Bathroom 92-1-1,Colerain,1,45,A,Monday
+Bathroom 92-1-2,Colerain,2,45,A,Monday
+Hallway 92-1,Colerain,3,60,A,Monday
+Entrance E,Colerain,4,30,A,Monday
+Stairwell E,Colerain,1,30,A,Monday
+Stairwell B,Colerain,2,30,A,Wednesday
+Hallway 92-2,Colerain,3,60,A,Wednesday
+Worship Center,Colerain,4,120,A,Wednesday
+Bathroom 92-2-1,Colerain,1,45,A,Thursday
+Bathroom 92-2-2,Colerain,2,45,A,Thursday
+Hallway 92-3,Colerain,3,30,A,Thursday
+Bathroom 92-3-1,Colerain,4,45,A,Thursday
+Bathroom 92-3-2,Colerain,1,45,A,Thursday
+Worship Center Balcony,Colerain,2,60,A,Thursday
+Stairwell C,Colerain,3,30,A,Wednesday
+Stairwell D,Colerain,4,30,A,Wednesday
+Hallway 72-1,Colerain,1,30,B,Monday
+Bathroom 72-1-1,Colerain,2,45,B,Monday
+Bathroom 72-1-2,Colerain,3,45,B,Monday
+Room 124,Colerain,4,30,B,Monday
+Room 127,Colerain,1,30,B,Monday
+Room 130,Colerain,2,30,B,Monday
+Stairwell F,Colerain,3,30,B,Monday
+Entrance F,Colerain,4,30,B,Tuesday
+Hallway 72-2,Colerain,1,45,B,Tuesday
+Bathroom 72-2-1,Colerain,2,45,B,Tuesday
+Bathroom 72-2-2,Colerain,3,45,B,Tuesday
+Room Zone,Colerain,4,120,B,Tuesday
+Bathroom Zone,Colerain,1,30,B,Tuesday
+Kitchen 72-2,Colerain,2,30,B,Tuesday
+Entrance A,Colerain,3,45,B,Tuesday
+Room 220,Colerain,4,30,B,Tuesday
+Hallway 72-3,Colerain,1,45,B,Wednesday
+Bathroom 72-3-1,Colerain,2,45,B,Wednesday
+Bathroom 72-3-2,Colerain,3,45,B,Wednesday
+Room 320,Colerain,4,30,B,Wednesday
+Room 323,Colerain,1,30,B,Wednesday
+Room 326,Colerain,2,30,B,Wednesday
+Room 328,Colerain,3,30,B,Wednesday
+Room 330,Colerain,4,60,B,Wednesday
+Room Office,Colerain,1,60,B,Friday
+Hallway 25-1,Colerain,2,30,B,Friday
+Bathroom 25-1-1,Colerain,3,45,B,Friday
+Bathroom 25-1-2,Colerain,4,45,B,Friday
+Kitchen Office,Colerain,1,30,B,Friday
+Room Conf,Colerain,2,30,B,Friday
+Room Meet 1,Colerain,3,20,B,Friday
+Room Meet 2,Colerain,4,20,B,Friday
+Room Meet 3,Colerain,1,20,B,Friday
+Stairwell G,Colerain,2,30,A,Tuesday
+Gym,Colerain,3,60,A,Tuesday
+Hallway 25-2,Colerain,4,30,A,Tuesday
+Bathroom 25-2-1,Colerain,1,45,A,Tuesday
+Bathroom 25-2-2,Colerain,2,45,A,Tuesday
+Room 250,Colerain,3,30,A,Tuesday
+Room 254,Colerain,4,30,A,Tuesday
+Gym Balcony,Colerain,1,30,A,Tuesday
