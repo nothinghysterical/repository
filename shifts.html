@@ -53,6 +53,9 @@
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
+    const startOfWeek = new Date(today);
+    startOfWeek.setDate(today.getDate() - today.getDay()); // Sunday
+
     const dayOfWeekMap = {
       Sunday: 0,
       Monday: 1,
@@ -81,11 +84,20 @@
       return `${diffDays} day${diffDays === 1 ? "" : "s"} ago`;
     }
 
+    function mockLastCompletedMap() {
+      // Replace this mock with real data as needed
+      return new Map([
+        // ['Room 101', '2025-05-21'],
+        // ['Room 102', '2025-05-18'],
+        // Add actual completion dates here
+      ]);
+    }
+
     function handleCSV(content) {
       const lines = content.trim().split(/\r?\n/);
       lines.shift(); // remove header
 
-      const roomLastCompleted = new Map(); // stub for completion data
+      const roomLastCompleted = mockLastCompletedMap(); // <- insert real data here
       const tasksByPerson = {};
 
       lines.forEach(line => {
@@ -99,30 +111,33 @@
         if (!room || !scheduledDay) return;
 
         const scheduledDate = getDateThisWeek(scheduledDay);
-        const lastCompleted = roomLastCompleted.get(room); // assume empty unless integrated
-        const lastDate = lastCompleted ? new Date(lastCompleted) : null;
+        const lastCompletedStr = roomLastCompleted.get(room);
+        const lastCompleted = lastCompletedStr ? new Date(lastCompletedStr) : null;
 
         const task = {
           room,
-          scheduledDay,
           scheduledDate,
-          lastCompleted: lastDate
+          lastCompleted,
         };
 
-        const status = !lastDate || lastDate < scheduledDate ? 
-                       (scheduledDate < today ? 'Overdue' : 'Due Today') : 
-                       null;
+        let status = null;
 
-        if (!status) return;
-
-        if (!tasksByPerson[assigned]) {
-          tasksByPerson[assigned] = { overdue: [], today: [] };
+        if (!lastCompleted) {
+          status = scheduledDate < today ? 'Due Today' : null;
+        } else if (lastCompleted < scheduledDate) {
+          status = scheduledDate < today ? 'Due Today' : null;
+        } else if (lastCompleted >= startOfWeek) {
+          status = 'Requeued';
         }
 
-        if (status === 'Overdue') {
-          tasksByPerson[assigned].overdue.push(task);
-        } else {
+        if (!tasksByPerson[assigned]) {
+          tasksByPerson[assigned] = { today: [], requeued: [] };
+        }
+
+        if (status === 'Due Today') {
           tasksByPerson[assigned].today.push(task);
+        } else if (status === 'Requeued') {
+          tasksByPerson[assigned].requeued.push(task);
         }
       });
 
@@ -133,7 +148,7 @@
       const container = document.getElementById("results");
       container.innerHTML = "";
 
-      Object.entries(tasksByPerson).forEach(([person, { today, overdue }]) => {
+      Object.entries(tasksByPerson).forEach(([person, { today, requeued }]) => {
         const section = document.createElement("div");
         section.className = "section";
 
@@ -156,16 +171,15 @@
           section.appendChild(ul);
         }
 
-        if (overdue.length > 0) {
+        if (requeued.length > 0) {
           const h3 = document.createElement("h3");
-          h3.textContent = "Overdue";
+          h3.textContent = "Requeued";
           section.appendChild(h3);
 
           const ul = document.createElement("ul");
-          overdue.forEach(task => {
+          requeued.forEach(task => {
             const li = document.createElement("li");
-            li.classList.add("late");
-            const lastText = task.lastCompleted ? `(last completed: ${formatDateDiff(task.lastCompleted)})` : "(never completed)";
+            const lastText = task.lastCompleted ? `(last completed: ${formatDateDiff(task.lastCompleted)})` : "";
             li.textContent = `${task.room} ${lastText}`;
             ul.appendChild(li);
           });
