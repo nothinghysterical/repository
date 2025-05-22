@@ -2,203 +2,61 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <title>Cleaning Tasks for Today</title>
+  <title>Cleaning Task Summary</title>
   <style>
     body {
       font-family: Arial, sans-serif;
-      padding: 1em;
-      background: #f4f4f4;
-      color: #333;
-    }
-    h1 {
-      text-align: center;
+      line-height: 1.5;
+      background-color: #f4f4f4;
+      padding: 20px;
     }
     h2 {
-      margin-top: 2em;
-      background: #222;
+      background-color: #333;
       color: #fff;
-      padding: 0.5em;
+      padding: 10px;
     }
     h3 {
-      margin-top: 1em;
-      margin-bottom: 0.2em;
       color: #444;
+      margin-top: 20px;
+      margin-bottom: 5px;
       border-bottom: 1px solid #ccc;
-      padding-bottom: 0.2em;
     }
     ul {
-      list-style: none;
-      padding-left: 1em;
+      background-color: #fff;
+      padding: 10px 15px;
+      border: 1px solid #ccc;
+      list-style: disc inside;
+      margin: 0 0 20px 0;
     }
     li {
-      margin-bottom: 0.4em;
-    }
-    .late {
-      color: red;
-    }
-    .section {
-      background: #fff;
-      padding: 1em;
-      border-radius: 6px;
-      box-shadow: 0 0 5px rgba(0,0,0,0.05);
-      margin-bottom: 2em;
+      padding: 5px 0;
     }
   </style>
 </head>
 <body>
-  <h1>Cleaning Tasks for Today</h1>
-  <div id="results">Loading...</div>
 
-  <script>
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
+  <h2>Cleaning Tasks for Thursday, May 22, 2025</h2>
 
-    const startOfWeek = new Date(today);
-    startOfWeek.setDate(today.getDate() - today.getDay()); // Sunday
+  <h3>Alice – Due Today</h3>
+  <ul>
+    <li>Room 103</li>
+  </ul>
 
-    const dayOfWeekMap = {
-      Sunday: 0,
-      Monday: 1,
-      Tuesday: 2,
-      Wednesday: 3,
-      Thursday: 4,
-      Friday: 5,
-      Saturday: 6
-    };
+  <h3>Alice – Overdue</h3>
+  <ul>
+    <li>Room 102</li>
+    <li>Room 104</li>
+  </ul>
 
-    function getDateThisWeek(dayName) {
-      const now = new Date();
-      const todayIdx = now.getDay();
-      const targetIdx = dayOfWeekMap[dayName];
-      const diff = targetIdx - todayIdx;
-      const result = new Date(now);
-      result.setDate(now.getDate() + diff);
-      result.setHours(0, 0, 0, 0);
-      return result;
-    }
+  <h3>Bob – Due Today</h3>
+  <ul>
+    <li>Room 108</li>
+  </ul>
 
-    function formatDateDiff(dateStr) {
-      if (!dateStr) return "never";
-      const date = new Date(dateStr);
-      const diffDays = Math.floor((today - date) / (1000 * 60 * 60 * 24));
-      return `${diffDays} day${diffDays === 1 ? "" : "s"} ago`;
-    }
+  <h3>Bob – Overdue</h3>
+  <ul>
+    <li>Room 107</li>
+  </ul>
 
-    function mockLastCompletedMap() {
-      // Replace this mock with real data as needed
-      return new Map([
-        // ['Room 101', '2025-05-21'],
-        // ['Room 102', '2025-05-18'],
-        // Add actual completion dates here
-      ]);
-    }
-
-    function handleCSV(content) {
-      const lines = content.trim().split(/\r?\n/);
-      lines.shift(); // remove header
-
-      const roomLastCompleted = mockLastCompletedMap(); // <- insert real data here
-      const tasksByPerson = {};
-
-      lines.forEach(line => {
-        const parts = line.split(',').map(p => p.trim());
-        if (parts.length < 6) return;
-
-        const [room, campus, priorityStr, timeStr, assignedRaw, dayNameRaw] = parts;
-        const assigned = assignedRaw || "Unassigned";
-        const scheduledDay = dayNameRaw;
-
-        if (!room || !scheduledDay) return;
-
-        const scheduledDate = getDateThisWeek(scheduledDay);
-        const lastCompletedStr = roomLastCompleted.get(room);
-        const lastCompleted = lastCompletedStr ? new Date(lastCompletedStr) : null;
-
-        const task = {
-          room,
-          scheduledDate,
-          lastCompleted,
-        };
-
-        let status = null;
-
-        if (!lastCompleted) {
-          status = scheduledDate < today ? 'Due Today' : null;
-        } else if (lastCompleted < scheduledDate) {
-          status = scheduledDate < today ? 'Due Today' : null;
-        } else if (lastCompleted >= startOfWeek) {
-          status = 'Requeued';
-        }
-
-        if (!tasksByPerson[assigned]) {
-          tasksByPerson[assigned] = { today: [], requeued: [] };
-        }
-
-        if (status === 'Due Today') {
-          tasksByPerson[assigned].today.push(task);
-        } else if (status === 'Requeued') {
-          tasksByPerson[assigned].requeued.push(task);
-        }
-      });
-
-      renderResults(tasksByPerson);
-    }
-
-    function renderResults(tasksByPerson) {
-      const container = document.getElementById("results");
-      container.innerHTML = "";
-
-      Object.entries(tasksByPerson).forEach(([person, { today, requeued }]) => {
-        const section = document.createElement("div");
-        section.className = "section";
-
-        const heading = document.createElement("h2");
-        heading.textContent = person;
-        section.appendChild(heading);
-
-        if (today.length > 0) {
-          const h3 = document.createElement("h3");
-          h3.textContent = "Due Today";
-          section.appendChild(h3);
-
-          const ul = document.createElement("ul");
-          today.forEach(task => {
-            const li = document.createElement("li");
-            const lastText = task.lastCompleted ? `(last completed: ${formatDateDiff(task.lastCompleted)})` : "(never completed)";
-            li.textContent = `${task.room} ${lastText}`;
-            ul.appendChild(li);
-          });
-          section.appendChild(ul);
-        }
-
-        if (requeued.length > 0) {
-          const h3 = document.createElement("h3");
-          h3.textContent = "Requeued";
-          section.appendChild(h3);
-
-          const ul = document.createElement("ul");
-          requeued.forEach(task => {
-            const li = document.createElement("li");
-            const lastText = task.lastCompleted ? `(last completed: ${formatDateDiff(task.lastCompleted)})` : "";
-            li.textContent = `${task.room} ${lastText}`;
-            ul.appendChild(li);
-          });
-          section.appendChild(ul);
-        }
-
-        container.appendChild(section);
-      });
-    }
-
-    fetch('rooms-shifts.csv')
-      .then(resp => {
-        if (!resp.ok) throw new Error("Could not load CSV.");
-        return resp.text();
-      })
-      .then(handleCSV)
-      .catch(err => {
-        document.getElementById("results").textContent = `Error: ${err.message}`;
-      });
-  </script>
 </body>
 </html>
