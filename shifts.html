@@ -1,100 +1,96 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Room Completion Status</title>
+  <meta charset="UTF-8" />
+  <title>Room Assignments</title>
   <style>
-    body { font-family: Arial, sans-serif; padding: 20px; }
-    h2 { margin-top: 40px; }
-    ul { list-style-type: none; padding: 0; }
-    li { margin: 5px 0; }
-    .done { text-decoration: line-through; color: gray; }
+    body { font-family: Arial, sans-serif; margin: 20px; }
+    h2 { margin-top: 30px; }
   </style>
 </head>
 <body>
-  <h1>A (assigned name)</h1>
-  <h2>Due Today</h2>
-  <ul id="due-today"></ul>
+  <h1>Assignments for A</h1>
+  <h2>Due today</h2>
+  <ul id="dueTodayList"></ul>
 
   <h2>Overdue</h2>
-  <ul id="overdue"></ul>
+  <ul id="overdueList"></ul>
 
-  <p id="all-complete" style="font-weight: bold; color: green;"></p>
+  <p id="allDoneMessage" style="font-weight: bold;"></p>
 
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
   <script>
-    const apiKey = '5b9a10e2092947d49dac84004ad149a2';
-    const formId = '250955404825056';
-    const roomFieldId = '18';
+    const API_KEY = '5b9a10e2092947d49dac84004ad149a2';
+    const FORM_ID = '250955404825056';
+    const ROOM_FIELD_ID = '18';
 
-    async function getCompletedRooms() {
-      const response = await fetch(`https://api.jotform.com/form/${formId}/submissions?apiKey=${apiKey}`);
+    const today = new Date();
+    const currentDay = today.toLocaleString('en-US', { weekday: 'long' });
+    const previousMonday = new Date(today);
+    previousMonday.setDate(today.getDate() - ((today.getDay() + 6) % 7)); // last Monday
+
+    let assignedRooms = [];
+
+    function fetchCSV() {
+      fetch('rooms-shifts.csv')
+        .then(response => response.text())
+        .then(text => {
+          const parsed = Papa.parse(text, { header: true });
+          assignedRooms = parsed.data.filter(r => r.Assigned === 'A' && r.Room);
+          fetchSubmissions();
+        });
+    }
+
+    async function fetchSubmissions() {
+      const response = await fetch(`https://api.jotform.com/form/${FORM_ID}/submissions?apiKey=${API_KEY}`);
       const data = await response.json();
-      const submissions = data.content;
-      return submissions.map(s => s.answers[roomFieldId]?.answer).filter(Boolean);
-    }
+      const submissions = data.content || [];
 
-    async function loadRooms() {
-      const response = await fetch('rooms-shifts.csv');
-      const text = await response.text();
-      const rows = text.trim().split('\n').slice(1);
-      const rooms = rows.map(r => {
-        const [Room, Campus, Priority, Time, Assigned, Day] = r.split(',');
-        return { Room, Campus, Priority, Time, Assigned, Day };
-      });
-      return rooms.filter(r => r.Assigned === 'A');
-    }
-
-    function isMonday(date) {
-      return date.getDay() === 1;
-    }
-
-    function getPastMonday(date) {
-      const day = date.getDay();
-      const diff = day === 0 ? 6 : day - 1;
-      const pastMonday = new Date(date);
-      pastMonday.setDate(date.getDate() - diff);
-      pastMonday.setHours(0, 0, 0, 0);
-      return pastMonday;
-    }
-
-    async function render() {
-      const completedRooms = await getCompletedRooms();
-      const allRooms = await loadRooms();
-      const today = new Date();
-      const todayStr = today.toLocaleDateString('en-US', { weekday: 'long' });
-      const pastMonday = getPastMonday(today);
-
-      const dueToday = allRooms.filter(r => r.Day === todayStr && !completedRooms.includes(r.Room));
-      const overdue = allRooms.filter(r => {
-        const day = r.Day;
-        const roomDay = new Date(pastMonday);
-        if (day === 'Monday') return !completedRooms.includes(r.Room);
-        return false;
-      });
-
-      const dueTodayList = document.getElementById('due-today');
-      dueToday.forEach(r => {
-        const li = document.createElement('li');
-        li.textContent = r.Room;
-        dueTodayList.appendChild(li);
-      });
-
-      const overdueList = document.getElementById('overdue');
-      overdue.forEach(r => {
-        if (!dueToday.find(x => x.Room === r.Room)) { // avoid duplicates
-          const li = document.createElement('li');
-          li.textContent = r.Room;
-          overdueList.appendChild(li);
+      const completedRooms = new Set();
+      for (let sub of submissions) {
+        const createdAt = new Date(sub.created_at);
+        if (createdAt >= previousMonday) {
+          const roomAnswer = sub.answers?.[ROOM_FIELD_ID]?.answer?.trim();
+          if (roomAnswer) {
+            completedRooms.add(roomAnswer);
+          }
         }
-      });
+      }
 
-      if (dueToday.length === 0 && overdue.filter(r => !dueToday.find(x => x.Room === r.Room)).length === 0) {
-        document.getElementById('all-complete').textContent = 'See Brian for additional items';
+      displayRooms(completedRooms);
+    }
+
+    function displayRooms(completedRooms) {
+      const dueToday = [];
+      const overdue = [];
+
+      for (const room of assignedRooms) {
+        if (completedRooms.has(room.Room)) continue;
+        if (room.Day === currentDay) {
+          dueToday.push(room.Room);
+        } else {
+          const dayOfWeek = room.Day;
+          const dayNum = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"].indexOf(dayOfWeek);
+          const roomDate = new Date(previousMonday);
+          roomDate.setDate(previousMonday.getDate() + (dayNum - 1)); // offset to correct day
+
+          if (roomDate < today) {
+            overdue.push(room.Room);
+          }
+        }
+      }
+
+      const dueList = document.getElementById('dueTodayList');
+      const overdueList = document.getElementById('overdueList');
+      dueToday.forEach(r => dueList.innerHTML += `<li>${r}</li>`);
+      overdue.forEach(r => overdueList.innerHTML += `<li>${r}</li>`);
+
+      if (dueToday.length === 0 && overdue.length === 0) {
+        document.getElementById('allDoneMessage').textContent = "See Brian for additional items";
       }
     }
 
-    render();
+    fetchCSV();
   </script>
 </body>
 </html>
