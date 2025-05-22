@@ -28,9 +28,13 @@
   <div id="schedule">Loading schedule...</div>
 
   <script>
-    const daysIndex = { Sunday: 0, Monday: 1, Tuesday: 2, Wednesday: 3, Thursday: 4, Friday: 5, Saturday: 6 };
+    // Map day names case-insensitive to day index (0=Sun ... 6=Sat)
+    const daysIndex = {
+      sunday: 0, monday: 1, tuesday: 2,
+      wednesday: 3, thursday: 4, friday: 5, saturday: 6
+    };
 
-    // Utility: parse CSV text into objects array
+    // Parse CSV text into array of objects
     function parseCSV(text) {
       const lines = text.trim().split('\n');
       const headers = lines[0].split(/\s*,\s*/);
@@ -44,23 +48,26 @@
       });
     }
 
-    // Get the previous Monday from a date
+    // Get previous Monday from a given date
     function getPreviousMonday(d) {
       const date = new Date(d);
       const day = date.getDay();
-      const diff = (day === 0 ? 6 : day - 1); // Monday is 1, Sunday 0 so map Sunday to 6
+      const diff = (day === 0 ? 6 : day - 1); // Monday = 1, Sunday=0 mapped to 6
       date.setDate(date.getDate() - diff);
       date.setHours(0,0,0,0);
       return date;
     }
 
-    // Main function
+    function dateToYMD(date) {
+      return date.toISOString().slice(0, 10);
+    }
+
     async function loadAndRenderSchedule() {
       const scheduleDiv = document.getElementById('schedule');
       scheduleDiv.textContent = 'Loading...';
 
       try {
-        const res = await fetch('rooms-shifts.csv');
+        const res = await fetch('/rooms-shifts.csv');
         if (!res.ok) throw new Error(`HTTP error ${res.status}`);
         const csvText = await res.text();
 
@@ -70,32 +77,42 @@
         today.setHours(0,0,0,0);
         const todayDayIndex = today.getDay();
 
-        // Previous Monday for overdue calculations
         const prevMonday = getPreviousMonday(today);
 
-        // Simulate lastCompleted as empty (no rooms completed)
-        // In a real system, integrate JotForm or DB data here keyed by room name
-        // Format for lastCompleted: Date object or null
-        // For demo, all lastCompleted = null
+        // We'll simulate no rooms completed (null LastCompleted)
         rooms.forEach(r => r.LastCompleted = null);
 
-        // Group by Assigned (A/B)
+        // Normalize Day field and map to index; filter invalid days
+        rooms.forEach(r => {
+          if (r.Day) {
+            r._dayIndex = daysIndex[r.Day.trim().toLowerCase()] ?? null;
+          } else {
+            r._dayIndex = null;
+          }
+        });
+
+        // Group rooms by Assigned
         const byPerson = {};
 
         rooms.forEach(room => {
-          const assigned = room.Assigned;
-          const roomDayIndex = daysIndex[room.Day];
-
+          const assigned = room.Assigned || 'Unassigned';
           if (!byPerson[assigned]) {
             byPerson[assigned] = { dueToday: [], overdue: [] };
           }
 
-          // Due Today: scheduled day matches today
-          if (roomDayIndex === todayDayIndex) {
+          const dayIndex = room._dayIndex;
+          if (dayIndex === null) return; // skip if invalid day
+
+          // Check due today
+          if (dayIndex === todayDayIndex) {
             byPerson[assigned].dueToday.push(room.Room);
           }
-          // Overdue: scheduled day before today, and not completed since prev Monday
-          else if (roomDayIndex < todayDayIndex) {
+          // Overdue: scheduled day is between Monday and yesterday
+          else if (
+            dayIndex >= 1 && // Monday=1, skip Sunday for overdue
+            dayIndex < todayDayIndex
+          ) {
+            // Check last completed against previous Monday (null means never completed)
             if (!room.LastCompleted || room.LastCompleted < prevMonday) {
               byPerson[assigned].overdue.push(room.Room);
             }
@@ -105,25 +122,33 @@
         // Clear loading message
         scheduleDiv.textContent = '';
 
-        // Render
-        for (const person of Object.keys(byPerson)) {
+        // Show all assigned persons even if no tasks
+        const allPersons = Object.keys(byPerson).sort();
+
+        if (!allPersons.length) {
+          scheduleDiv.textContent = 'No rooms assigned.';
+          return;
+        }
+
+        for (const person of allPersons) {
           const section = document.createElement('div');
           section.className = 'person-section';
 
           section.innerHTML = `<h2>Assigned to ${person}</h2>`;
 
-          // Due Today
+          // Due Today section
           const dueToday = byPerson[person].dueToday;
-          section.innerHTML += `<h3>Due Today (${Object.keys(daysIndex).find(k => daysIndex[k] === todayDayIndex)})</h3>`;
+          const todayName = Object.keys(daysIndex).find(k => daysIndex[k] === todayDayIndex) || 'Today';
+          section.innerHTML += `<h3>Due Today (${todayName.charAt(0).toUpperCase() + todayName.slice(1)})</h3>`;
           if (dueToday.length) {
             section.innerHTML += `<ul>${dueToday.map(r => `<li>${r}</li>`).join('')}</ul>`;
           } else {
             section.innerHTML += `<p>No rooms due today.</p>`;
           }
 
-          // Overdue
+          // Overdue section
           const overdue = byPerson[person].overdue;
-          section.innerHTML += `<h3>Overdue (from earlier this week)</h3>`;
+          section.innerHTML += `<h3>Overdue (earlier this week)</h3>`;
           if (overdue.length) {
             section.innerHTML += `<ul>${overdue.map(r => `<li>${r}</li>`).join('')}</ul>`;
           } else {
