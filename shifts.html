@@ -1,96 +1,120 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <title>Room Schedule Status</title>
-  <script src="https://cdn.jsdelivr.net/npm/papaparse@5.3.2/papaparse.min.js"></script>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Room Cleaning Schedule</title>
   <style>
-    body { font-family: Arial, sans-serif; margin: 20px; }
-    h2 { margin-top: 30px; }
-    ul { list-style-type: none; padding-left: 0; }
-    li { margin-bottom: 5px; }
+    body {
+      font-family: Arial, sans-serif;
+      padding: 1rem;
+    }
+    h2 {
+      margin-top: 2rem;
+    }
+    ul {
+      padding-left: 1.5rem;
+    }
+    li {
+      margin-bottom: 0.5rem;
+    }
   </style>
 </head>
 <body>
-  <h1>Room Schedule Report</h1>
-  <input type="file" id="csvFileInput" accept=".csv" />
-  <h2>Due Today</h2>
-  <ul id="dueToday"></ul>
-  <h2>Overdue</h2>
-  <ul id="overdue"></ul>
+  <h1>Room Cleaning Schedule</h1>
+  <div id="output"></div>
 
   <script>
     const apiKey = '5b9a10e2092947d49dac84004ad149a2';
     const formId = '250955404825056';
     const roomFieldId = '18';
 
-    const fetchCompletedRooms = async () => {
-      const response = await fetch(`https://api.jotform.com/form/${formId}/submissions?apiKey=${apiKey}`);
-      const data = await response.json();
+    const daysOfWeek = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 
-      const today = new Date().toDateString();
-      const completed = new Set();
+    function getLastMonday(date = new Date()) {
+      const d = new Date(date);
+      const day = d.getDay();
+      const diff = d.getDate() - day + (day === 0 ? -6 : 1);
+      return new Date(d.setDate(diff));
+    }
 
-      data.content.forEach(submission => {
-        const room = submission.answers?.[roomFieldId]?.answer?.trim();
-        const date = new Date(submission.created_at).toDateString();
-        if (room && date === today) {
-          completed.add(room);
+    function loadCSV(path) {
+      return fetch(path).then(response => response.text());
+    }
+
+    async function fetchTodayCompletions() {
+      const today = new Date().toISOString().split('T')[0];
+      const url = `https://api.jotform.com/form/${formId}/submissions?apikey=${apiKey}`;
+      const res = await fetch(url);
+      const data = await res.json();
+      const submissions = data.content || [];
+      const completedRooms = new Set();
+
+      for (const submission of submissions) {
+        const date = new Date(submission.created_at).toISOString().split('T')[0];
+        if (date === today) {
+          const room = submission.answers?.[roomFieldId]?.answer;
+          if (room) completedRooms.add(room.trim());
         }
+      }
+      return completedRooms;
+    }
+
+    function parseCSV(text) {
+      const lines = text.trim().split('\n');
+      const headers = lines[0].split('\t');
+      return lines.slice(1).map(line => {
+        const values = line.split('\t');
+        const obj = {};
+        headers.forEach((h, i) => obj[h] = values[i]);
+        return obj;
       });
+    }
 
-      return completed;
-    };
+    async function generateSchedule() {
+      const [csvText, completedRooms] = await Promise.all([
+        loadCSV('rooms-shifts.csv'),
+        fetchTodayCompletions()
+      ]);
 
-    const getWeekdayDate = (weekday) => {
+      const records = parseCSV(csvText);
+      const output = document.getElementById('output');
       const today = new Date();
-      const todayDay = today.getDay();
-      const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
-      const targetDay = dayNames.indexOf(weekday);
+      const todayDay = daysOfWeek[today.getDay()];
+      const lastMonday = getLastMonday(today);
+      const overdueDays = daysOfWeek.slice(1, today.getDay());
 
-      const diff = (targetDay - todayDay + 7) % 7;
-      const thisWeek = new Date(today);
-      thisWeek.setDate(today.getDate() + diff - (diff === 0 ? 7 : 0)); // find last weekday (including today)
+      const grouped = { A: { today: [], overdue: [] }, B: { today: [], overdue: [] } };
 
-      return thisWeek;
-    };
+      for (const r of records) {
+        const assigned = r.Assigned;
+        const roomName = r.Room.trim();
+        const scheduledDay = r.Day.trim();
 
-    const parseCSVAndCompare = async (file) => {
-      const completedRooms = await fetchCompletedRooms();
-      Papa.parse(file, {
-        header: true,
-        complete: (results) => {
-          const todayStr = new Date().toDateString();
-          const dueToday = [];
-          const overdue = [];
+        const scheduledDate = new Date(lastMonday);
+        const dayOffset = daysOfWeek.indexOf(scheduledDay);
+        scheduledDate.setDate(scheduledDate.getDate() + dayOffset);
 
-          results.data.forEach(room => {
-            const roomName = room.Room?.trim();
-            const assignedDay = room.Day?.trim();
-            const dueDate = getWeekdayDate(assignedDay);
+        if (completedRooms.has(roomName)) continue;
 
-            if (!roomName || isNaN(dueDate)) return;
-
-            const roomDueStr = dueDate.toDateString();
-            const isCompletedToday = completedRooms.has(roomName);
-
-            if (roomDueStr === todayStr && !isCompletedToday) {
-              dueToday.push(roomName);
-            } else if (dueDate < new Date() && !completedRooms.has(roomName)) {
-              overdue.push(roomName);
-            }
-          });
-
-          document.getElementById('dueToday').innerHTML = dueToday.map(r => `<li>${r}</li>`).join('');
-          document.getElementById('overdue').innerHTML = overdue.map(r => `<li>${r}</li>`).join('');
+        if (scheduledDay === todayDay) {
+          grouped[assigned].today.push(roomName);
+        } else if (overdueDays.includes(scheduledDay)) {
+          grouped[assigned].overdue.push(roomName);
         }
-      });
-    };
+      }
 
-    document.getElementById('csvFileInput').addEventListener('change', (event) => {
-      const file = event.target.files[0];
-      if (file) parseCSVAndCompare(file);
-    });
+      output.innerHTML = '';
+      ["A", "B"].forEach(group => {
+        output.innerHTML += `<h2>Group ${group}</h2>`;
+        output.innerHTML += `<h3>Due Today</h3><ul>` +
+          (grouped[group].today.length ? grouped[group].today.map(r => `<li>${r}</li>`).join('') : '<li>No rooms due today</li>') + '</ul>';
+        output.innerHTML += `<h3>Overdue</h3><ul>` +
+          (grouped[group].overdue.length ? grouped[group].overdue.map(r => `<li>${r}</li>`).join('') : '<li>No overdue rooms</li>') + '</ul>';
+      });
+    }
+
+    generateSchedule();
   </script>
 </body>
 </html>
