@@ -6,17 +6,13 @@
   <style>
     body { font-family: Arial, sans-serif; margin: 20px; }
     h2 { margin-top: 30px; }
+    .person-block { margin-bottom: 40px; border-top: 1px solid #ccc; padding-top: 20px; }
   </style>
 </head>
 <body>
-  <h1>Assignments for A</h1>
-  <h2>Due today</h2>
-  <ul id="dueTodayList"></ul>
+  <h1>Room Assignments</h1>
 
-  <h2>Overdue</h2>
-  <ul id="overdueList"></ul>
-
-  <p id="allDoneMessage" style="font-weight: bold;"></p>
+  <div id="assignmentsContainer"></div>
 
   <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
   <script>
@@ -27,16 +23,21 @@
     const today = new Date();
     const currentDay = today.toLocaleString('en-US', { weekday: 'long' });
     const previousMonday = new Date(today);
-    previousMonday.setDate(today.getDate() - ((today.getDay() + 6) % 7)); // last Monday
+    previousMonday.setDate(today.getDate() - ((today.getDay() + 6) % 7));
 
-    let assignedRooms = [];
+    let assignedRoomsByPerson = {};
 
     function fetchCSV() {
       fetch('rooms-shifts.csv')
         .then(response => response.text())
         .then(text => {
           const parsed = Papa.parse(text, { header: true });
-          assignedRooms = parsed.data.filter(r => r.Assigned === 'A' && r.Room);
+          for (const row of parsed.data) {
+            if (!row.Room || !row.Assigned) continue;
+            const person = row.Assigned.trim();
+            if (!assignedRoomsByPerson[person]) assignedRoomsByPerson[person] = [];
+            assignedRoomsByPerson[person].push(row);
+          }
           fetchSubmissions();
         });
     }
@@ -57,36 +58,54 @@
         }
       }
 
-      displayRooms(completedRooms);
+      displayAssignments(completedRooms);
     }
 
-    function displayRooms(completedRooms) {
-      const dueToday = [];
-      const overdue = [];
+    function displayAssignments(completedRooms) {
+      const container = document.getElementById('assignmentsContainer');
+      container.innerHTML = '';
 
-      for (const room of assignedRooms) {
-        if (completedRooms.has(room.Room)) continue;
-        if (room.Day === currentDay) {
-          dueToday.push(room.Room);
-        } else {
-          const dayOfWeek = room.Day;
-          const dayNum = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"].indexOf(dayOfWeek);
-          const roomDate = new Date(previousMonday);
-          roomDate.setDate(previousMonday.getDate() + (dayNum - 1)); // offset to correct day
+      for (const person in assignedRoomsByPerson) {
+        const rooms = assignedRoomsByPerson[person];
+        const dueToday = [];
+        const overdue = [];
 
-          if (roomDate < today) {
-            overdue.push(room.Room);
+        for (const room of rooms) {
+          if (completedRooms.has(room.Room)) continue;
+
+          if (room.Day === currentDay) {
+            dueToday.push(room.Room);
+          } else {
+            const roomDayNum = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"]
+              .indexOf(room.Day);
+            const roomDate = new Date(previousMonday);
+            roomDate.setDate(previousMonday.getDate() + (roomDayNum - 1));
+            if (roomDate < today) {
+              overdue.push(room.Room);
+            }
           }
         }
-      }
 
-      const dueList = document.getElementById('dueTodayList');
-      const overdueList = document.getElementById('overdueList');
-      dueToday.forEach(r => dueList.innerHTML += `<li>${r}</li>`);
-      overdue.forEach(r => overdueList.innerHTML += `<li>${r}</li>`);
+        // Create DOM section for this person
+        const block = document.createElement('div');
+        block.classList.add('person-block');
+        block.innerHTML = `<h2>${person}</h2>`;
 
-      if (dueToday.length === 0 && overdue.length === 0) {
-        document.getElementById('allDoneMessage').textContent = "See Brian for additional items";
+        if (dueToday.length > 0) {
+          const dueList = dueToday.map(r => `<li>${r}</li>`).join('');
+          block.innerHTML += `<h3>Due today</h3><ul>${dueList}</ul>`;
+        }
+
+        if (overdue.length > 0) {
+          const overdueList = overdue.map(r => `<li>${r}</li>`).join('');
+          block.innerHTML += `<h3>Overdue</h3><ul>${overdueList}</ul>`;
+        }
+
+        if (dueToday.length === 0 && overdue.length === 0) {
+          block.innerHTML += `<p><strong>See Brian for additional items</strong></p>`;
+        }
+
+        container.appendChild(block);
       }
     }
 
