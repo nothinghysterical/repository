@@ -145,7 +145,9 @@
 
       const roomCsv = await fetch('rooms.csv').then(res => res.text());
       const allRooms = parseCSV(roomCsv);
-      const submissions = await fetch(`https://api.jotform.com/form/${formId}/submissions?apiKey=${apiKey}`)
+
+      // ✅ Add limit=1000 to get more than default 20 submissions
+      const submissions = await fetch(`https://api.jotform.com/form/${formId}/submissions?apiKey=${apiKey}&limit=1000`)
         .then(res => res.json())
         .then(data => data.content || []);
 
@@ -194,23 +196,22 @@
       progressBar.textContent = `${percentComplete}%`;
 
       if (percentComplete === 100) {
-  fetch('https://prod-155.westus.logic.azure.com:443/workflows/f977d3d1831a40ba82d5e6c0861eb84c/triggers/manual/paths/invoke?api-version=2016-06-01', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json'
-    },
-    body: JSON.stringify({
-      message: 'Room check-ins are 100% complete!',
-      percent: percentComplete
-    })
-  })
-  .then(res => {
-    if (!res.ok) throw new Error('Power Automate request failed');
-    console.log('Notification sent via Power Automate');
-  })
-  .catch(console.error);
-}
-
+        fetch('https://prod-155.westus.logic.azure.com:443/workflows/f977d3d1831a40ba82d5e6c0861eb84c/triggers/manual/paths/invoke?api-version=2016-06-01', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            message: 'Room check-ins are 100% complete!',
+            percent: percentComplete
+          })
+        })
+        .then(res => {
+          if (!res.ok) throw new Error('Power Automate request failed');
+          console.log('Notification sent via Power Automate');
+        })
+        .catch(console.error);
+      }
 
       const tbody = document.querySelector('#status-table tbody');
 
