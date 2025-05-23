@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Room Check-Ins</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <style>
+    html, body {
+      margin: 0;
+      padding: 0;
+      height: 100%;
+      width: 100%;
+      font-family: sans-serif;
+      background: #fff;
+    }
+
+    h2, h4 {
+      text-align: center;
+      margin-top: 10px;
+      font-size: 28px;
+    }
+
+    .summary, .progress-container {
+      text-align: center;
+    }
+
+    .progress-container {
+      width: 60%;
+      margin: 0 auto 20px;
+      height: 30px;
+      background-color: #e0e0e0;
+      border-radius: 10px;
+      overflow: hidden;
+    }
+
+    .progress-bar {
+      height: 100%;
+      background-color: #28a745;
+      color: white;
+      font-weight: bold;
+      text-align: center;
+      line-height: 30px;
+      transition: width 0.5s;
+    }
+
+    input[type="text"] {
+      margin: 10px auto;
+      padding: 10px;
+      width: 300px;
+      font-size: 16px;
+      display: block;
+    }
+
+    .table-wrapper {
+      height: 600px;
+      overflow: hidden;
+      margin: 0 auto;
+      width: 90%;
+      position: relative;
+    }
+
+    table {
+      border-collapse: collapse;
+      width: 100%;
+    }
+
+    th, td {
+      padding: 10px 12px;
+      border: 1px solid #ccc;
+      text-align: left;
+      font-size: 18px;
+    }
+
+    th {
+      background: #f2f2f2;
+      cursor: pointer;
+    }
+
+    tr.hidden {
+      display: none;
+    }
+
+    @media (min-width: 1900px) {
+      body {
+        font-size: 18px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <h2>Room Check-Ins This Week</h2>
+  <div class="summary" id="week-summary"></div>
+  <div class="progress-container">
+    <div class="progress-bar" id="completion-bar">0%</div>
+  </div>
+  <input type="text" id="filter" placeholder="Search pending rooms or names..." />
+  <div class="table-wrapper">
+    <table id="status-table">
+      <thead>
+        <tr>
+          <th data-key="room">Room</th>
+          <th data-key="status">Status</th>
+          <th data-key="lastDate">Last Submission</th>
+          <th data-key="count">Count</th>
+          <th data-key="completedBy">Completed By</th>
+        </tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+  </div>
+
+  <script>
+    const apiKey = '5b9a10e2092947d49dac84004ad149a2';
+    const formId = '250955404825056';
+    const roomFieldId = '18';
+    const completedByFieldId = '29';
+
+    function getWeekBounds() {
+      const now = new Date();
+      const day = now.getDay();
+      const diffToMonday = (day === 0) ? -6 : 1 - day;
+      const monday = new Date(now);
+      monday.setHours(0, 0, 0, 0);
+      monday.setDate(now.getDate() + diffToMonday);
+
+      const sunday = new Date(monday);
+      sunday.setDate(monday.getDate() + 6);
+      sunday.setHours(23, 59, 59, 999);
+
+      return { monday, sunday };
+    }
+
+    function parseCSV(text) {
+      return text.trim().split('\n').map(line => line.trim()).filter(Boolean);
+    }
+
+    function getUrlParam(param) {
+      const url = new URL(window.location);
+      return url.searchParams.get(param);
+    }
+
+    async function main() {
+      const { monday, sunday } = getWeekBounds();
+      document.getElementById('week-summary').innerText =
+        `${monday.toLocaleDateString()} – ${sunday.toLocaleDateString()}`;
+
+      const roomCsv = await fetch('rooms.csv').then(res => res.text());
+      const allRooms = parseCSV(roomCsv);
+
+      const submissions = await fetch(`https://api.jotform.com/form/${formId}/submissions?apiKey=${apiKey}&limit=1000`)
+        .then(res => res.json())
+        .then(data => data.content || []);
+
+      const roomsMap = new Map();
+
+      submissions.forEach(sub => {
+        const createdAt = new Date(sub.created_at);
+        if (createdAt < monday || createdAt > sunday) return;
+
+        const room = sub.answers?.[roomFieldId]?.answer?.trim();
+        const completedBy = sub.answers?.[completedByFieldId]?.answer?.trim() || '';
+
+        if (!room) return;
+
+        if (!roomsMap.has(room)) {
+          roomsMap.set(room, {
+            count: 1,
+            lastDate: createdAt,
+            completedBy
+          });
+        } else {
+          const entry = roomsMap.get(room);
+          entry.count += 1;
+          if (createdAt > entry.lastDate) {
+            entry.lastDate = createdAt;
+            entry.completedBy = completedBy;
+          }
+        }
+      });
+
+      const rows = allRooms.map(room => {
+        const entry = roomsMap.get(room);
+        const completed = !!entry;
+        return {
+          room,
+          status: completed ? '✅ Completed' : '🟡 Pending',
+          lastDate: entry ? entry.lastDate.toLocaleString() : '',
+          count: entry ? entry.count : 0,
+          completedBy: entry ? entry.completedBy : '',
+        };
+      });
+
+      const percentComplete = Math.round((rows.filter(r => r.status.includes('✅')).length / allRooms.length) * 100);
+      const progressBar = document.getElementById('completion-bar');
+      progressBar.style.width = `${percentComplete}%`;
+      progressBar.textContent = `${percentComplete}%`;
+
+      const tbody = document.querySelector('#status-table tbody');
+      const pendingRows = rows.filter(r => r.status.includes('🟡'));
+
+      let currentIndex = 0;
+      const rowsPerPage = 12;
+
+      function renderPage(startIndex) {
+        tbody.innerHTML = '';
+        for (let i = 0; i < rowsPerPage; i++) {
+          const row = pendingRows[(startIndex + i) % pendingRows.length];
+          const tr = document.createElement('tr');
+          tr.innerHTML = `
+            <td>${row.room}</td>
+            <td>${row.status}</td>
+            <td>${row.lastDate}</td>
+            <td>${row.count}</td>
+            <td>${row.completedBy}</td>
+          `;
+          tbody.appendChild(tr);
+        }
+      }
+
+      function nextPage() {
+        currentIndex = (currentIndex + rowsPerPage) % pendingRows.length;
+        renderPage(currentIndex);
+      }
+
+      renderPage(currentIndex);
+      setInterval(nextPage, 5000); // Change page every 5 seconds
+
+      // Optional: Add live filter
+      document.getElementById('filter').addEventListener('input', e => {
+        const query = e.target.value.toLowerCase();
+        const filtered = pendingRows.filter(r =>
+          r.room.toLowerCase().includes(query) || r.completedBy.toLowerCase().includes(query)
+        );
+        tbody.innerHTML = '';
+        filtered.slice(0, rowsPerPage).forEach(r => {
+          const tr = document.createElement('tr');
+          tr.innerHTML = `
+            <td>${r.room}</td>
+            <td>${r.status}</td>
+            <td>${r.lastDate}</td>
+            <td>${r.count}</td>
+            <td>${r.completedBy}</td>
+          `;
+          tbody.appendChild(tr);
+        });
+      });
+    }
+
+    main().catch(err => {
+      console.error(err);
+      document.body.insertAdjacentHTML('beforeend', '<p style="color:red;">Error loading data</p>');
+    });
+  </script>
+</body>
+</html>
