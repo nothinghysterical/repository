@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Room Check-Ins This Week (Mon–Sun)</title>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <style>
@@ -11,7 +11,6 @@
       margin: 20px;
       text-align: center;
     }
-
     canvas {
       max-width: 1000px;
       width: 100%;
@@ -25,28 +24,100 @@
   <canvas id="checkinChart"></canvas>
 
   <script>
-    async function fetchChartData() {
-      // Simulate data points for every hour over 7 days (168 hours)
-      const data = [];
-      let percent = 0;
-      for (let hour = 0; hour < 168; hour++) {
-        // Fake completion rate increase (for demo only)
-        percent = Math.min(100, percent + Math.random() * 1.2);
-        data.push({ x: hour, y: parseFloat(percent.toFixed(2)) });
-      }
-      return data;
+    const apiKey = '5b9a10e2092947d49dac84004ad149a2';
+    const formId = '250955404825056';
+    const roomFieldId = '18';
+
+    // Returns the Monday of current week at 00:00:00
+    function getWeekStart() {
+      const now = new Date();
+      const day = now.getDay();
+      const diffToMonday = (day === 0) ? -6 : 1 - day;
+      const monday = new Date(now);
+      monday.setHours(0, 0, 0, 0);
+      monday.setDate(now.getDate() + diffToMonday);
+      return monday;
     }
 
-    async function renderChart() {
-      const ctx = document.getElementById('checkinChart').getContext('2d');
-      const data = await fetchChartData();
+    async function fetchRooms() {
+      const res = await fetch('rooms.csv');
+      const text = await res.text();
+      return text.trim().split('\n').map(line => line.trim()).filter(Boolean);
+    }
 
+    async function fetchSubmissions() {
+      const url = `https://api.jotform.com/form/${formId}/submissions?apiKey=${apiKey}&limit=1000`;
+      const res = await fetch(url);
+      const json = await res.json();
+      return json.content || [];
+    }
+
+    // Round down date to the hour since week start, return hour offset [0..167]
+    function getHourOffset(date, weekStart) {
+      const diffMs = date - weekStart;
+      const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
+      return diffHours;
+    }
+
+    async function main() {
+      const weekStart = getWeekStart();
+      const weekEnd = new Date(weekStart);
+      weekEnd.setDate(weekStart.getDate() + 7);
+
+      const rooms = await fetchRooms(); // all room names
+      const submissions = await fetchSubmissions();
+
+      // Filter submissions inside the week, get room and date
+      const filteredSubs = submissions
+        .map(sub => {
+          const date = new Date(sub.created_at);
+          if (date < weekStart || date > weekEnd) return null;
+          const room = sub.answers?.[roomFieldId]?.answer?.trim();
+          if (!room) return null;
+          return { room, date };
+        })
+        .filter(Boolean);
+
+      // For each room, find the earliest submission datetime in week (to consider it "completed" from that hour forward)
+      const roomCompletionTime = new Map();
+
+      filteredSubs.forEach(({room, date}) => {
+        if (!roomCompletionTime.has(room) || date < roomCompletionTime.get(room)) {
+          roomCompletionTime.set(room, date);
+        }
+      });
+
+      // Initialize an array for each hour of the week, store cumulative percent completed
+      const hours = 168;
+      const percentCompleteByHour = new Array(hours).fill(0);
+
+      // For each hour, count how many rooms have completion time <= that hour
+      for (let h = 0; h < hours; h++) {
+        const hourTime = new Date(weekStart);
+        hourTime.setHours(weekStart.getHours() + h);
+
+        // Count rooms completed up to this hour
+        let completedCount = 0;
+        for (const room of rooms) {
+          const compTime = roomCompletionTime.get(room);
+          if (compTime && compTime <= hourTime) {
+            completedCount++;
+          }
+        }
+        percentCompleteByHour[h] = (completedCount / rooms.length) * 100;
+      }
+
+      // Prepare data for Chart.js (x = hour offset, y = percent)
+      const chartData = percentCompleteByHour.map((pct, idx) => ({ x: idx, y: parseFloat(pct.toFixed(2)) }));
+
+      // Render chart
+      const ctx = document.getElementById('checkinChart').getContext('2d');
       new Chart(ctx, {
         type: 'line',
         data: {
           datasets: [{
             label: '% Completed',
-            data: data,
+            data: chartData,
             borderColor: '#28a745',
             backgroundColor: 'rgba(40, 167, 69, 0.1)',
             fill: true,
@@ -60,12 +131,12 @@
             x: {
               type: 'linear',
               title: { display: true, text: 'Hour of the Week (0–167)' },
+              min: 0,
+              max: 167,
               ticks: {
                 stepSize: 1,
-                callback: (val) => val % 24 === 0 ? `Day ${val / 24}` : ''
-              },
-              min: 0,
-              max: 167
+                callback: val => (val % 24 === 0) ? `Day ${val/24}` : ''
+              }
             },
             y: {
               title: { display: true, text: '% Completed' },
@@ -78,16 +149,16 @@
             }
           },
           plugins: {
-            legend: { display: false },
-            title: {
-              display: false
-            }
+            legend: { display: false }
           }
         }
       });
     }
 
-    renderChart();
+    main().catch(err => {
+      console.error(err);
+      alert('Error loading data. See console.');
+    });
   </script>
 </body>
 </html>
