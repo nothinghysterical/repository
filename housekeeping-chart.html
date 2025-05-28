@@ -87,8 +87,16 @@
         }
       });
 
-      // Initialize an array for each hour of the week, store cumulative percent completed
-      const hours = 168;
+      // Find max completion hour (latest completion among all rooms)
+      let maxCompletionHour = 0;
+
+      for (const compTime of roomCompletionTime.values()) {
+        const hour = getHourOffset(compTime, weekStart);
+        if (hour > maxCompletionHour) maxCompletionHour = hour;
+      }
+
+      // Initialize an array for each hour up to maxCompletionHour, store cumulative percent completed
+      const hours = maxCompletionHour + 1; // inclusive
       const percentCompleteByHour = new Array(hours).fill(0);
 
       // For each hour, count how many rooms have completion time <= that hour
@@ -130,12 +138,12 @@
           scales: {
             x: {
               type: 'linear',
-              title: { display: true, text: 'Hour of the Week (0–167)' },
+              title: { display: true, text: 'Hour of the Week (0–' + maxCompletionHour + ')' },
               min: 0,
-              max: 167,
+              max: maxCompletionHour,
               ticks: {
                 stepSize: 1,
-                callback: val => (val % 24 === 0) ? `Day ${val/24}` : ''
+                callback: val => (val % 24 === 0) ? `Day ${val / 24}` : ''
               }
             },
             y: {
