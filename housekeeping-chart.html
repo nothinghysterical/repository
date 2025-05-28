@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Room Check-In Status (This Week)</title>
+  <title>Room Check-Ins This Week (Mon–Sun)</title>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <style>
     body {
@@ -11,131 +11,75 @@
       margin: 20px;
       text-align: center;
     }
+
     canvas {
       max-width: 1000px;
-      margin: 0 auto;
+      width: 100%;
+      height: 400px;
+      margin: auto;
     }
   </style>
 </head>
 <body>
   <h2>Room Check-Ins This Week (Mon–Sun)</h2>
-  <canvas id="roomChart" width="1000" height="400"></canvas>
+  <canvas id="checkinChart"></canvas>
 
   <script>
-    const apiKey = '5b9a10e2092947d49dac84004ad149a2';
-    const formId = '250955404825056';
-    const roomFieldId = '18';
-
-    function getWeekBounds() {
-      const now = new Date();
-      const day = now.getDay();
-      const diffToMonday = (day === 0) ? -6 : 1 - day;
-      const monday = new Date(now);
-      monday.setHours(0, 0, 0, 0);
-      monday.setDate(now.getDate() + diffToMonday);
-
-      const sunday = new Date(monday);
-      sunday.setDate(monday.getDate() + 6);
-      sunday.setHours(23, 0, 0, 0);
-
-      return { monday, sunday };
-    }
-
-    function generateHourlyLabels(startDate) {
-      const labels = [];
-      const date = new Date(startDate);
-      for (let i = 0; i < 168; i++) {
-        labels.push(new Date(date));
-        date.setHours(date.getHours() + 1);
+    async function fetchChartData() {
+      // Simulate data points for every hour over 7 days (168 hours)
+      const data = [];
+      let percent = 0;
+      for (let hour = 0; hour < 168; hour++) {
+        // Fake completion rate increase (for demo only)
+        percent = Math.min(100, percent + Math.random() * 1.2);
+        data.push({ x: hour, y: parseFloat(percent.toFixed(2)) });
       }
-      return labels;
+      return data;
     }
 
-    async function main() {
-      const { monday, sunday } = getWeekBounds();
+    async function renderChart() {
+      const ctx = document.getElementById('checkinChart').getContext('2d');
+      const data = await fetchChartData();
 
-      const [roomCsv, submissionRes] = await Promise.all([
-        fetch('rooms.csv').then(res => res.text()),
-        fetch(`https://api.jotform.com/form/${formId}/submissions?apiKey=${apiKey}&limit=1000`).then(res => res.json())
-      ]);
-
-      const allRooms = roomCsv.trim().split('\n').map(r => r.trim()).filter(Boolean);
-      const totalRooms = allRooms.length;
-
-      const submissions = (submissionRes.content || []).filter(sub => {
-        const createdAt = new Date(sub.created_at);
-        return createdAt >= monday && createdAt <= sunday;
-      });
-
-      const submittedRooms = new Set();
-      const hourMap = new Array(168).fill(0);
-
-      submissions.forEach(sub => {
-        const createdAt = new Date(sub.created_at);
-        const room = sub.answers?.[roomFieldId]?.answer?.trim();
-        if (!room || submittedRooms.has(room)) return;
-
-        const hourIndex = Math.floor((createdAt - monday) / (1000 * 60 * 60));
-        if (hourIndex >= 0 && hourIndex < 168) {
-          submittedRooms.add(room);
-          for (let i = hourIndex; i < 168; i++) {
-            hourMap[i]++;
-          }
-        }
-      });
-
-      const percentCompleted = hourMap.map(count => Math.round((count / totalRooms) * 100));
-      const labels = generateHourlyLabels(monday);
-
-      const ctx = document.getElementById('roomChart').getContext('2d');
       new Chart(ctx, {
         type: 'line',
         data: {
-          labels: labels,
           datasets: [{
-            label: 'Percent Completed',
-            data: percentCompleted,
+            label: '% Completed',
+            data: data,
             borderColor: '#28a745',
-            backgroundColor: 'rgba(40,167,69,0.1)',
+            backgroundColor: 'rgba(40, 167, 69, 0.1)',
             fill: true,
-            tension: 0.3,
-            pointRadius: 0
+            tension: 0.2,
+            pointRadius: 0,
           }]
         },
         options: {
           responsive: true,
           scales: {
             x: {
-              type: 'time',
-              time: {
-                unit: 'hour',
-                displayFormats: {
-                  hour: 'ddd HH:mm'
-                },
-                tooltipFormat: 'ddd HH:mm'
-              },
-              title: {
-                display: true,
-                text: 'Date/Time'
-              },
+              type: 'linear',
+              title: { display: true, text: 'Hour of the Week (0–167)' },
               ticks: {
-                maxTicksLimit: 24 * 7
-              }
+                stepSize: 1,
+                callback: (val) => val % 24 === 0 ? `Day ${val / 24}` : ''
+              },
+              min: 0,
+              max: 167
             },
             y: {
+              title: { display: true, text: '% Completed' },
               min: 0,
               max: 100,
-              title: {
-                display: true,
-                text: 'Percent Completed'
-              },
               ticks: {
-                callback: value => `${value}%`
+                stepSize: 20,
+                callback: val => `${val}%`
               }
             }
           },
           plugins: {
-            legend: {
+            legend: { display: false },
+            title: {
               display: false
             }
           }
@@ -143,10 +87,7 @@
       });
     }
 
-    main().catch(err => {
-      console.error(err);
-      document.body.insertAdjacentHTML('beforeend', '<p style="color:red;">Error loading chart</p>');
-    });
+    renderChart();
   </script>
 </body>
 </html>
