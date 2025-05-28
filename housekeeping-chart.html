@@ -12,14 +12,14 @@
       text-align: center;
     }
     canvas {
-      max-width: 800px;
+      max-width: 1000px;
       margin: 0 auto;
     }
   </style>
 </head>
 <body>
   <h2>Room Check-Ins This Week (Mon–Sun)</h2>
-  <canvas id="roomChart"></canvas>
+  <canvas id="roomChart" width="1000" height="400"></canvas>
 
   <script>
     const apiKey = '5b9a10e2092947d49dac84004ad149a2';
@@ -36,67 +36,102 @@
 
       const sunday = new Date(monday);
       sunday.setDate(monday.getDate() + 6);
-      sunday.setHours(23, 59, 59, 999);
+      sunday.setHours(23, 0, 0, 0);
 
       return { monday, sunday };
+    }
+
+    function generateHourlyLabels(startDate) {
+      const labels = [];
+      const date = new Date(startDate);
+      for (let i = 0; i < 168; i++) {
+        labels.push(new Date(date));
+        date.setHours(date.getHours() + 1);
+      }
+      return labels;
     }
 
     async function main() {
       const { monday, sunday } = getWeekBounds();
 
-      const submissions = await fetch(`https://api.jotform.com/form/${formId}/submissions?apiKey=${apiKey}&limit=1000`)
-        .then(res => res.json())
-        .then(data => data.content || []);
+      const [roomCsv, submissionRes] = await Promise.all([
+        fetch('rooms.csv').then(res => res.text()),
+        fetch(`https://api.jotform.com/form/${formId}/submissions?apiKey=${apiKey}&limit=1000`).then(res => res.json())
+      ]);
 
-      const timeCounts = {};
+      const allRooms = roomCsv.trim().split('\n').map(r => r.trim()).filter(Boolean);
+      const totalRooms = allRooms.length;
+
+      const submissions = (submissionRes.content || []).filter(sub => {
+        const createdAt = new Date(sub.created_at);
+        return createdAt >= monday && createdAt <= sunday;
+      });
+
+      const submittedRooms = new Set();
+      const hourMap = new Array(168).fill(0);
 
       submissions.forEach(sub => {
         const createdAt = new Date(sub.created_at);
-        if (createdAt < monday || createdAt > sunday) return;
-
         const room = sub.answers?.[roomFieldId]?.answer?.trim();
-        if (!room) return;
+        if (!room || submittedRooms.has(room)) return;
 
-        const roundedTime = createdAt.toLocaleString(); // or toISOString() for consistent format
-        timeCounts[roundedTime] = (timeCounts[roundedTime] || 0) + 1;
+        const hourIndex = Math.floor((createdAt - monday) / (1000 * 60 * 60));
+        if (hourIndex >= 0 && hourIndex < 168) {
+          submittedRooms.add(room);
+          for (let i = hourIndex; i < 168; i++) {
+            hourMap[i]++;
+          }
+        }
       });
 
-      const sortedTimes = Object.keys(timeCounts).sort((a, b) => new Date(a) - new Date(b));
-      const cumulativeCounts = [];
-      let total = 0;
-      sortedTimes.forEach(time => {
-        total += timeCounts[time];
-        cumulativeCounts.push(total);
-      });
+      const percentCompleted = hourMap.map(count => Math.round((count / totalRooms) * 100));
+      const labels = generateHourlyLabels(monday);
 
       const ctx = document.getElementById('roomChart').getContext('2d');
       new Chart(ctx, {
         type: 'line',
         data: {
-          labels: sortedTimes,
+          labels: labels,
           datasets: [{
-            label: 'Rooms Completed',
-            data: cumulativeCounts,
+            label: 'Percent Completed',
+            data: percentCompleted,
             borderColor: '#28a745',
             backgroundColor: 'rgba(40,167,69,0.1)',
             fill: true,
-            tension: 0.3
+            tension: 0.3,
+            pointRadius: 0
           }]
         },
         options: {
+          responsive: true,
           scales: {
             x: {
+              type: 'time',
+              time: {
+                unit: 'hour',
+                displayFormats: {
+                  hour: 'ddd HH:mm'
+                },
+                tooltipFormat: 'ddd HH:mm'
+              },
               title: {
                 display: true,
-                text: 'Submission Date/Time'
+                text: 'Date/Time'
+              },
+              ticks: {
+                maxTicksLimit: 24 * 7
               }
             },
             y: {
+              min: 0,
+              max: 100,
               title: {
                 display: true,
-                text: 'Cumulative Rooms Completed'
+                text: 'Percent Completed'
               },
-              beginAtZero: true
+              ticks: {
+                callback: value => `${value}%`
+              }
             }
           },
           plugins: {
