@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Room Check-In Status (This Week)</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    body {
+      font-family: sans-serif;
+      margin: 20px;
+      text-align: center;
+    }
+    canvas {
+      max-width: 800px;
+      margin: 0 auto;
+    }
+  </style>
+</head>
+<body>
+  <h2>Room Check-Ins This Week (Mon–Sun)</h2>
+  <canvas id="roomChart"></canvas>
+
+  <script>
+    const apiKey = '5b9a10e2092947d49dac84004ad149a2';
+    const formId = '250955404825056';
+    const roomFieldId = '18';
+
+    function getWeekBounds() {
+      const now = new Date();
+      const day = now.getDay();
+      const diffToMonday = (day === 0) ? -6 : 1 - day;
+      const monday = new Date(now);
+      monday.setHours(0, 0, 0, 0);
+      monday.setDate(now.getDate() + diffToMonday);
+
+      const sunday = new Date(monday);
+      sunday.setDate(monday.getDate() + 6);
+      sunday.setHours(23, 59, 59, 999);
+
+      return { monday, sunday };
+    }
+
+    async function main() {
+      const { monday, sunday } = getWeekBounds();
+
+      const submissions = await fetch(`https://api.jotform.com/form/${formId}/submissions?apiKey=${apiKey}&limit=1000`)
+        .then(res => res.json())
+        .then(data => data.content || []);
+
+      const timeCounts = {};
+
+      submissions.forEach(sub => {
+        const createdAt = new Date(sub.created_at);
+        if (createdAt < monday || createdAt > sunday) return;
+
+        const room = sub.answers?.[roomFieldId]?.answer?.trim();
+        if (!room) return;
+
+        const roundedTime = createdAt.toLocaleString(); // or toISOString() for consistent format
+        timeCounts[roundedTime] = (timeCounts[roundedTime] || 0) + 1;
+      });
+
+      const sortedTimes = Object.keys(timeCounts).sort((a, b) => new Date(a) - new Date(b));
+      const cumulativeCounts = [];
+      let total = 0;
+      sortedTimes.forEach(time => {
+        total += timeCounts[time];
+        cumulativeCounts.push(total);
+      });
+
+      const ctx = document.getElementById('roomChart').getContext('2d');
+      new Chart(ctx, {
+        type: 'line',
+        data: {
+          labels: sortedTimes,
+          datasets: [{
+            label: 'Rooms Completed',
+            data: cumulativeCounts,
+            borderColor: '#28a745',
+            backgroundColor: 'rgba(40,167,69,0.1)',
+            fill: true,
+            tension: 0.3
+          }]
+        },
+        options: {
+          scales: {
+            x: {
+              title: {
+                display: true,
+                text: 'Submission Date/Time'
+              }
+            },
+            y: {
+              title: {
+                display: true,
+                text: 'Cumulative Rooms Completed'
+              },
+              beginAtZero: true
+            }
+          },
+          plugins: {
+            legend: {
+              display: false
+            }
+          }
+        }
+      });
+    }
+
+    main().catch(err => {
+      console.error(err);
+      document.body.insertAdjacentHTML('beforeend', '<p style="color:red;">Error loading chart</p>');
+    });
+  </script>
+</body>
+</html>
