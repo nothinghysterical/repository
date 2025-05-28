@@ -28,7 +28,6 @@
     const formId = '250955404825056';
     const roomFieldId = '18';
 
-    // Returns the Monday of current week at 00:00:00
     function getWeekStart() {
       const now = new Date();
       const day = now.getDay();
@@ -52,11 +51,9 @@
       return json.content || [];
     }
 
-    // Round down date to the hour since week start, return hour offset [0..167]
     function getHourOffset(date, weekStart) {
       const diffMs = date - weekStart;
-      const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
-      return diffHours;
+      return Math.floor(diffMs / (1000 * 60 * 60));
     }
 
     async function main() {
@@ -64,10 +61,9 @@
       const weekEnd = new Date(weekStart);
       weekEnd.setDate(weekStart.getDate() + 7);
 
-      const rooms = await fetchRooms(); // all room names
+      const rooms = await fetchRooms();
       const submissions = await fetchSubmissions();
 
-      // Filter submissions inside the week, get room and date
       const filteredSubs = submissions
         .map(sub => {
           const date = new Date(sub.created_at);
@@ -78,47 +74,45 @@
         })
         .filter(Boolean);
 
-      // For each room, find the earliest submission datetime in week (to consider it "completed" from that hour forward)
       const roomCompletionTime = new Map();
 
-      filteredSubs.forEach(({room, date}) => {
+      filteredSubs.forEach(({ room, date }) => {
         if (!roomCompletionTime.has(room) || date < roomCompletionTime.get(room)) {
           roomCompletionTime.set(room, date);
         }
       });
 
-      // Find max completion hour (latest completion among all rooms)
-      let maxCompletionHour = 0;
+      // Find the latest submission hour offset
+      let latestHour = 0;
+      filteredSubs.forEach(({ date }) => {
+        const hourOffset = getHourOffset(date, weekStart);
+        if (hourOffset > latestHour) latestHour = hourOffset;
+      });
 
-      for (const compTime of roomCompletionTime.values()) {
-        const hour = getHourOffset(compTime, weekStart);
-        if (hour > maxCompletionHour) maxCompletionHour = hour;
-      }
+      const hours = 168;
+      const percentCompleteByHour = new Array(hours).fill(null);
 
-      // Initialize an array for each hour up to maxCompletionHour, store cumulative percent completed
-      const hours = maxCompletionHour + 1; // inclusive
-      const percentCompleteByHour = new Array(hours).fill(0);
-
-      // For each hour, count how many rooms have completion time <= that hour
-      for (let h = 0; h < hours; h++) {
+      for (let h = 0; h <= latestHour; h++) {
         const hourTime = new Date(weekStart);
         hourTime.setHours(weekStart.getHours() + h);
 
-        // Count rooms completed up to this hour
         let completedCount = 0;
         for (const room of rooms) {
           const compTime = roomCompletionTime.get(room);
-          if (compTime && compTime <= hourTime) {
-            completedCount++;
-          }
+          if (compTime && compTime <= hourTime) completedCount++;
         }
         percentCompleteByHour[h] = (completedCount / rooms.length) * 100;
       }
 
-      // Prepare data for Chart.js (x = hour offset, y = percent)
-      const chartData = percentCompleteByHour.map((pct, idx) => ({ x: idx, y: parseFloat(pct.toFixed(2)) }));
+      // After latestHour, keep values null to break the line
+      for (let h = latestHour + 1; h < hours; h++) {
+        percentCompleteByHour[h] = null;
+      }
 
-      // Render chart
+      const chartData = percentCompleteByHour.map((pct, idx) => {
+        return { x: idx, y: pct === null ? null : parseFloat(pct.toFixed(2)) };
+      });
+
       const ctx = document.getElementById('checkinChart').getContext('2d');
       new Chart(ctx, {
         type: 'line',
@@ -131,6 +125,7 @@
             fill: true,
             tension: 0.2,
             pointRadius: 0,
+            spanGaps: false // Important: don't connect null points
           }]
         },
         options: {
@@ -138,12 +133,12 @@
           scales: {
             x: {
               type: 'linear',
-              title: { display: true, text: 'Hour of the Week (0–' + maxCompletionHour + ')' },
+              title: { display: true, text: 'Hour of the Week (Mon–Sun)' },
               min: 0,
-              max: maxCompletionHour,
+              max: 167,
               ticks: {
                 stepSize: 1,
-                callback: val => (val % 24 === 0) ? `Day ${val / 24}` : ''
+                callback: val => (val % 24 === 0) ? `Day ${val / 24 + 1}` : ''
               }
             },
             y: {
