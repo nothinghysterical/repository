@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Weekly Room Assignments</title>
+  <title>Weekly Room Assignments by Housekeeper</title>
   <style>
     body {
       font-family: Arial, sans-serif;
@@ -11,10 +11,12 @@
     h2 {
       text-align: center;
     }
-    .day-section {
-      margin-bottom: 30px;
+    .housekeeper-section {
+      margin-bottom: 40px;
+      border-bottom: 1px solid #ccc;
+      padding-bottom: 20px;
     }
-    .housekeeper {
+    .day {
       margin-left: 20px;
     }
     ul {
@@ -31,9 +33,7 @@
     const apiKey = 'YOUR_JOTFORM_API_KEY';
     const formId = 'YOUR_FORM_ID';
     const roomFieldId = '18'; // Replace with actual field ID
-    const completedByFieldId = '29'; // Replace with actual field ID
 
-    // Function to get current week's Monday and Sunday
     function getWeekBounds() {
       const now = new Date();
       const day = now.getDay();
@@ -41,15 +41,12 @@
       const monday = new Date(now);
       monday.setHours(0, 0, 0, 0);
       monday.setDate(now.getDate() + diffToMonday);
-
       const sunday = new Date(monday);
       sunday.setDate(monday.getDate() + 6);
       sunday.setHours(23, 59, 59, 999);
-
       return { monday, sunday };
     }
 
-    // Function to parse CSV text into an array of objects
     function parseCSV(text) {
       const lines = text.trim().split('\n');
       const headers = lines[0].split('\t');
@@ -63,11 +60,9 @@
       });
     }
 
-    // Main function to load data and render the schedule
     async function loadSchedule() {
       const { monday, sunday } = getWeekBounds();
 
-      // Fetch and parse CSV files
       const [scheduleText, assigneesText] = await Promise.all([
         fetch('Colerain - Special Schedule.csv').then(res => res.text()),
         fetch('Colerain Assignees.csv').then(res => res.text())
@@ -75,76 +70,75 @@
       const schedule = parseCSV(scheduleText);
       const assignees = parseCSV(assigneesText);
 
-      // Fetch submissions from Jotform
+      // Build a map from housekeeper letter to name
+      const nameMap = {};
+      assignees.forEach(a => {
+        nameMap[a['Housekeeper']] = a['Name'];
+      });
+
+      // Fetch completed submissions
       const submissions = await fetch(`https://api.jotform.com/form/${formId}/submissions?apiKey=${apiKey}&limit=1000`)
         .then(res => res.json())
         .then(data => data.content || []);
 
-      // Create a set of completed room names for the current week
       const completedRooms = new Set();
       submissions.forEach(sub => {
         const createdAt = new Date(sub.created_at);
         if (createdAt >= monday && createdAt <= sunday) {
           const room = sub.answers?.[roomFieldId]?.answer?.trim();
-          if (room) {
-            completedRooms.add(room);
-          }
+          if (room) completedRooms.add(room);
         }
       });
 
-      // Filter out completed tasks
       const pendingTasks = schedule.filter(task => !completedRooms.has(task['Room Name']));
 
-      // Group tasks by day and housekeeper
-      const groupedTasks = {};
+      // Group by Housekeeper → Day → Room Name
+      const grouped = {};
       pendingTasks.forEach(task => {
+        const hk = task['Housekeeper'];
+        const name = nameMap[hk] || `Housekeeper ${hk}`;
         const day = task['Day'];
-        const housekeeper = task['Housekeeper'];
         const room = task['Room Name'];
 
-        if (!groupedTasks[day]) {
-          groupedTasks[day] = {};
-        }
-        if (!groupedTasks[day][housekeeper]) {
-          groupedTasks[day][housekeeper] = [];
-        }
-        groupedTasks[day][housekeeper].push(room);
+        if (!grouped[name]) grouped[name] = {};
+        if (!grouped[name][day]) grouped[name][day] = [];
+        grouped[name][day].push(room);
       });
 
-      // Render the schedule
+      // Render
       const container = document.getElementById('schedule-container');
       container.innerHTML = '';
-      Object.keys(groupedTasks).forEach(day => {
-        const daySection = document.createElement('div');
-        daySection.className = 'day-section';
-        const dayHeader = document.createElement('h3');
-        dayHeader.textContent = day;
-        daySection.appendChild(dayHeader);
 
-        Object.keys(groupedTasks[day]).forEach(housekeeper => {
-          const housekeeperDiv = document.createElement('div');
-          housekeeperDiv.className = 'housekeeper';
-          const housekeeperHeader = document.createElement('h4');
-          housekeeperHeader.textContent = `Housekeeper ${housekeeper}`;
-          housekeeperDiv.appendChild(housekeeperHeader);
+      Object.keys(grouped).forEach(name => {
+        const hkSection = document.createElement('div');
+        hkSection.className = 'housekeeper-section';
 
-          const roomList = document.createElement('ul');
-          groupedTasks[day][housekeeper].forEach(room => {
-            const listItem = document.createElement('li');
-            listItem.textContent = room;
-            roomList.appendChild(listItem);
+        const hkHeader = document.createElement('h3');
+        hkHeader.textContent = name;
+        hkSection.appendChild(hkHeader);
+
+        Object.keys(grouped[name]).forEach(day => {
+          const dayHeader = document.createElement('h4');
+          dayHeader.className = 'day';
+          dayHeader.textContent = day;
+          hkSection.appendChild(dayHeader);
+
+          const list = document.createElement('ul');
+          grouped[name][day].forEach(room => {
+            const li = document.createElement('li');
+            li.textContent = room;
+            list.appendChild(li);
           });
-          housekeeperDiv.appendChild(roomList);
-          daySection.appendChild(housekeeperDiv);
+
+          hkSection.appendChild(list);
         });
 
-        container.appendChild(daySection);
+        container.appendChild(hkSection);
       });
     }
 
-    // Load the schedule on page load
-    loadSchedule().catch(error => {
-      console.error('Error loading schedule:', error);
+    loadSchedule().catch(err => {
+      console.error('Error loading data:', err);
     });
   </script>
 </body>
