@@ -1,144 +1,192 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <title>Weekly Room Assignments by Housekeeper</title>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Pending Room Assignments</title>
   <style>
     body {
-      font-family: Arial, sans-serif;
+      font-family: sans-serif;
       margin: 20px;
     }
-    h2 {
+    h1 {
       text-align: center;
+      margin-bottom: 1rem;
     }
-    .housekeeper-section {
-      margin-bottom: 40px;
-      border-bottom: 1px solid #ccc;
-      padding-bottom: 20px;
+    h2 {
+      margin-top: 2rem;
+      margin-bottom: 0.5rem;
     }
-    .day {
-      margin-left: 20px;
+    h3 {
+      margin-left: 1rem;
+      margin-bottom: 0.25rem;
+      color: #333;
     }
     ul {
+      margin-left: 2rem;
+      margin-bottom: 1rem;
       list-style-type: disc;
-      margin-left: 40px;
+    }
+    .no-pending {
+      text-align: center;
+      color: #666;
+      margin-top: 2rem;
+      font-style: italic;
     }
   </style>
 </head>
 <body>
-  <h2>Pending Room Assignments</h2>
-  <div id="schedule-container"></div>
-
+  <h1>Pending Room Assignments</h1>
+  <div id="assignments"></div>
   <script>
-    const apiKey = 'YOUR_JOTFORM_API_KEY';
-    const formId = 'YOUR_FORM_ID';
-    const roomFieldId = '18'; // Replace with actual field ID
+    // Map housekeeper initials to full names (from "Colerain Assignees" CSV)
+    const housekeeperNames = {
+      A: 'Brian',
+      B: 'Thomas',
+      C: 'Lisa'
+    };
 
-    function getWeekBounds() {
-      const now = new Date();
-      const day = now.getDay();
-      const diffToMonday = (day === 0) ? -6 : 1 - day;
-      const monday = new Date(now);
-      monday.setHours(0, 0, 0, 0);
-      monday.setDate(now.getDate() + diffToMonday);
-      const sunday = new Date(monday);
-      sunday.setDate(monday.getDate() + 6);
-      sunday.setHours(23, 59, 59, 999);
-      return { monday, sunday };
-    }
+    // Weekdays ordered Mon-Sun for display and sorting
+    const weekdayOrder = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
 
-    function parseCSV(text) {
-      const lines = text.trim().split('\n');
-      const headers = lines[0].split('\t');
+    // Parse CSV text into array of objects
+    function parseCsv(text) {
+      const lines = text.trim().split('\n').filter(line => line.trim() !== '');
+      const headers = lines[0].split(/\t|,/).map(h => h.trim());
       return lines.slice(1).map(line => {
-        const values = line.split('\t');
+        const values = line.split(/\t|,/);
         const obj = {};
-        headers.forEach((header, index) => {
-          obj[header.trim()] = values[index] ? values[index].trim() : '';
-        });
+        headers.forEach((h, i) => obj[h] = values[i]?.trim() || '');
         return obj;
       });
     }
 
-    async function loadSchedule() {
-      const { monday, sunday } = getWeekBounds();
+    // Get current week's Monday date object
+    function getMonday(date = new Date()) {
+      const d = new Date(date);
+      const day = d.getDay();
+      const diff = (day === 0 ? -6 : 1) - day;
+      d.setHours(0, 0, 0, 0);
+      d.setDate(d.getDate() + diff);
+      return d;
+    }
 
-      const [scheduleText, assigneesText] = await Promise.all([
-        fetch('Colerain - Special Schedule.csv').then(res => res.text()),
-        fetch('Colerain Assignees.csv').then(res => res.text())
-      ]);
-      const schedule = parseCSV(scheduleText);
-      const assignees = parseCSV(assigneesText);
+    // Check if date is in current week (Mon-Sun)
+    function isDateInCurrentWeek(date) {
+      const monday = getMonday();
+      const sunday = new Date(monday);
+      sunday.setDate(monday.getDate() + 6);
+      return date >= monday && date <= sunday;
+    }
 
-      // Build a map from housekeeper letter to name
-      const nameMap = {};
-      assignees.forEach(a => {
-        nameMap[a['Housekeeper']] = a['Name'];
-      });
+    async function load() {
+      const assignmentsDiv = document.getElementById('assignments');
 
-      // Fetch completed submissions
-      const submissions = await fetch(`https://api.jotform.com/form/${formId}/submissions?apiKey=${apiKey}&limit=1000`)
+      // Load the Special Schedule CSV
+      const scheduleResponse = await fetch('Colerain - Special Schedule.csv');
+      const scheduleText = await scheduleResponse.text();
+      const scheduleData = parseCsv(scheduleText);
+
+      // Load the Assignees CSV
+      const assigneesResponse = await fetch('Colerain Assignees.csv');
+      const assigneesText = await assigneesResponse.text();
+      const assigneesData = parseCsv(assigneesText);
+
+      // Build set of assigned rooms from Assignees CSV for filtering
+      // We will use it only to map housekeeper initials to names for filtering,
+      // but we already have that map above, so we can skip this step.
+
+      // Fetch JotForm submissions for the week
+      const apiKey = '5b9a10e2092947d49dac84004ad149a2';
+      const formId = '250955404825056';
+      const roomFieldId = '18';
+
+      const submissionsData = await fetch(`https://api.jotform.com/form/${formId}/submissions?apiKey=${apiKey}&limit=1000`)
         .then(res => res.json())
-        .then(data => data.content || []);
+        .then(json => json.content || []);
 
-      const completedRooms = new Set();
-      submissions.forEach(sub => {
+      // Filter submissions to only this week and get completed rooms (unique)
+      const monday = getMonday();
+      const sunday = new Date(monday);
+      sunday.setDate(monday.getDate() + 6);
+
+      const completedRoomsSet = new Set();
+      submissionsData.forEach(sub => {
         const createdAt = new Date(sub.created_at);
-        if (createdAt >= monday && createdAt <= sunday) {
-          const room = sub.answers?.[roomFieldId]?.answer?.trim();
-          if (room) completedRooms.add(room);
+        if (createdAt < monday || createdAt > sunday) return;
+
+        const room = sub.answers?.[roomFieldId]?.answer?.trim();
+        if (room) {
+          completedRoomsSet.add(room);
         }
       });
 
-      const pendingTasks = schedule.filter(task => !completedRooms.has(task['Room Name']));
-
-      // Group by Housekeeper → Day → Room Name
+      // Filter schedule to only pending rooms (not completed)
+      // Group by housekeeper, then by day (ordered)
       const grouped = {};
-      pendingTasks.forEach(task => {
-        const hk = task['Housekeeper'];
-        const name = nameMap[hk] || `Housekeeper ${hk}`;
-        const day = task['Day'];
-        const room = task['Room Name'];
 
-        if (!grouped[name]) grouped[name] = {};
-        if (!grouped[name][day]) grouped[name][day] = [];
-        grouped[name][day].push(room);
-      });
+      // Use housekeeper full name, default to initial if missing
+      function getName(initial) {
+        return housekeeperNames[initial] || initial;
+      }
 
-      // Render
-      const container = document.getElementById('schedule-container');
-      container.innerHTML = '';
+      // Build structure: grouped[housekeeperName][day] = [rooms]
+      for (const item of scheduleData) {
+        const day = item.Day;
+        const hkInitial = item.Housekeeper;
+        const room = item['Room Name'];
 
-      Object.keys(grouped).forEach(name => {
-        const hkSection = document.createElement('div');
-        hkSection.className = 'housekeeper-section';
+        if (!day || !hkInitial || !room) continue;
 
-        const hkHeader = document.createElement('h3');
-        hkHeader.textContent = name;
-        hkSection.appendChild(hkHeader);
+        // Skip if room was completed this week
+        if (completedRoomsSet.has(room)) continue;
 
-        Object.keys(grouped[name]).forEach(day => {
-          const dayHeader = document.createElement('h4');
-          dayHeader.className = 'day';
-          dayHeader.textContent = day;
-          hkSection.appendChild(dayHeader);
+        const hkName = getName(hkInitial);
+        if (!grouped[hkName]) grouped[hkName] = {};
+        if (!grouped[hkName][day]) grouped[hkName][day] = [];
+        grouped[hkName][day].push(room);
+      }
 
-          const list = document.createElement('ul');
-          grouped[name][day].forEach(room => {
-            const li = document.createElement('li');
-            li.textContent = room;
-            list.appendChild(li);
+      // Sort days inside each housekeeper by weekdayOrder
+      // Also skip housekeepers with no pending rooms
+      const housekeepersWithPending = Object.entries(grouped)
+        .map(([hkName, days]) => {
+          // Filter days to only those with rooms, and sort days by weekdayOrder
+          const filteredDays = {};
+          weekdayOrder.forEach(day => {
+            if (days[day]?.length) {
+              filteredDays[day] = days[day];
+            }
           });
+          return [hkName, filteredDays];
+        })
+        .filter(([_, days]) => Object.keys(days).length > 0);
 
-          hkSection.appendChild(list);
-        });
+      // If no pending rooms at all:
+      if (housekeepersWithPending.length === 0) {
+        assignmentsDiv.innerHTML = `<p class="no-pending">All rooms are completed this week!</p>`;
+        return;
+      }
 
-        container.appendChild(hkSection);
+      // Build HTML for display
+      let html = '';
+      housekeepersWithPending.forEach(([hkName, days]) => {
+        html += `<h2>${hkName}</h2>`;
+        for (const day of Object.keys(days)) {
+          html += `<h3>${day}</h3><ul>`;
+          days[day].forEach(room => {
+            html += `<li>${room}</li>`;
+          });
+          html += `</ul>`;
+        }
       });
+
+      assignmentsDiv.innerHTML = html;
     }
 
-    loadSchedule().catch(err => {
-      console.error('Error loading data:', err);
+    load().catch(err => {
+      document.getElementById('assignments').innerHTML = `<p style="color:red;">Error loading assignments: ${err.message}</p>`;
+      console.error(err);
     });
   </script>
 </body>
