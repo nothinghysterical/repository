@@ -82,7 +82,6 @@
       const apiKey = '5b9a10e2092947d49dac84004ad149a2';
       const formId = '250955404825056';
       const roomFieldId = '18';
-      const spaceFieldId = '19'; // assuming this is the field for reset note
 
       const submissionsData = await fetch(`https://api.jotform.com/form/${formId}/submissions?apiKey=${apiKey}&limit=1000`)
         .then(res => res.json())
@@ -99,21 +98,27 @@
         const createdAt = new Date(sub.created_at);
         if (createdAt < monday || createdAt > sunday) return;
 
-        const room = sub.answers?.[roomFieldId]?.answer?.trim();
-        const spaceField = sub.answers?.[spaceFieldId]?.answer?.trim().toLowerCase();
+        let rawRoom = sub.answers?.[roomFieldId]?.answer?.trim();
+        if (!rawRoom) return;
 
-        if (room) {
-          if (spaceField && spaceField.includes("reset")) {
-            if (!resetMap[room] || createdAt > resetMap[room]) {
-              resetMap[room] = createdAt;
-            }
-          } else {
-            if (!completedMap[room] || createdAt > new Date(completedMap[room].date)) {
-              completedMap[room] = {
-                date: createdAt,
-                display: createdAt.toLocaleString()
-              };
-            }
+        const lower = rawRoom.toLowerCase();
+        const isReset = lower.includes("reset");
+
+        // Extract base room name by removing "reset"
+        const room = rawRoom.replace(/reset/i, '').trim();
+
+        if (!room) return;
+
+        if (isReset) {
+          if (!resetMap[room] || createdAt > resetMap[room]) {
+            resetMap[room] = createdAt;
+          }
+        } else {
+          if (!completedMap[room] || createdAt > new Date(completedMap[room].date)) {
+            completedMap[room] = {
+              date: createdAt,
+              display: createdAt.toLocaleString()
+            };
           }
         }
       });
