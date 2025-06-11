@@ -34,62 +34,50 @@
       font-style: italic;
     }
     .completed {
-      color: #228B22;
-      font-weight: bold;
+      color: green;
     }
-    .reset {
-      color: #d35400;
-      font-style: italic;
+    .returned {
+      color: orange;
     }
-    #progress-container {
+    .progress-bar {
       width: 100%;
-      background: #eee;
+      background-color: #e0e0e0;
       border-radius: 10px;
       overflow: hidden;
-      margin: 1rem 0;
+      margin-bottom: 1rem;
     }
-    #progress-bar {
+    .progress-fill {
       height: 20px;
-      background: #4caf50;
+      background-color: #4caf50;
       width: 0%;
-      transition: width 0.5s ease;
-    }
-    #progress-label {
+      transition: width 0.5s;
       text-align: center;
-      font-size: 0.9rem;
-      margin-bottom: 0.5rem;
+      color: white;
+      line-height: 20px;
     }
-    #refresh-button {
-      display: block;
-      margin: 0 auto 1rem auto;
-      padding: 8px 16px;
-      font-size: 1rem;
-      border: none;
+    .refresh-button {
+      display: inline-block;
+      margin: 0 auto 1rem;
+      padding: 0.5rem 1rem;
       background-color: #007bff;
       color: white;
+      border: none;
       border-radius: 5px;
       cursor: pointer;
     }
-    #refresh-button:hover {
-      background-color: #0056b3;
-    }
-    #schedule-name {
+    .schedule-name {
       text-align: center;
-      font-size: 0.9rem;
-      color: #888;
       margin-top: 2rem;
+      color: #666;
     }
   </style>
 </head>
 <body>
   <h1>Pending Room Assignments</h1>
-  <button id="refresh-button">Refresh</button>
-  <div id="progress-label">Completion: 0%</div>
-  <div id="progress-container">
-    <div id="progress-bar"></div>
-  </div>
+  <button class="refresh-button" onclick="location.reload()">Refresh</button>
+  <div class="progress-bar"><div id="progress" class="progress-fill">0%</div></div>
   <div id="assignments"></div>
-  <div id="schedule-name"></div>
+  <div class="schedule-name" id="scheduleName"></div>
 
   <script>
     const housekeeperNames = { A: 'Brian', B: 'Thomas', C: 'Lisa' };
@@ -116,23 +104,35 @@
     }
 
     function getWeekOfMonth(mondayDate) {
-      const firstOfMonth = new Date(mondayDate.getFullYear(), mondayDate.getMonth(), 1);
-      const firstMonday = getMonday(firstOfMonth);
-      const weekNumber = Math.floor((mondayDate - firstMonday) / (7 * 24 * 60 * 60 * 1000)) + 1;
-      return Math.max(1, weekNumber);
+      const year = mondayDate.getFullYear();
+      const month = mondayDate.getMonth();
+      const firstOfMonth = new Date(year, month, 1);
+      let mondayCount = 0;
+      let current = new Date(firstOfMonth);
+      while (current <= mondayDate) {
+        if (current.getDay() === 1) mondayCount++;
+        current.setDate(current.getDate() + 1);
+      }
+      return mondayCount;
+    }
+
+    function isDateInCurrentWeek(date) {
+      const monday = getMonday();
+      const sunday = new Date(monday);
+      sunday.setDate(monday.getDate() + 6);
+      return date >= monday && date <= sunday;
     }
 
     async function load() {
       const assignmentsDiv = document.getElementById('assignments');
-      const progressBar = document.getElementById('progress-bar');
-      const progressLabel = document.getElementById('progress-label');
-      const scheduleNameDiv = document.getElementById('schedule-name');
+      const progressBar = document.getElementById('progress');
+      const scheduleNameDiv = document.getElementById('scheduleName');
 
       const monday = getMonday();
       const weekNumber = getWeekOfMonth(monday);
       const scheduleFilename = `/schedules/Colerain-Week${weekNumber}.csv`;
 
-      scheduleNameDiv.textContent = `Using schedule: ${scheduleFilename.replace('/schedules/', '')}`;
+      scheduleNameDiv.textContent = `Schedule: Colerain-Week${weekNumber}`;
 
       let scheduleText;
       try {
@@ -145,7 +145,6 @@
       }
 
       const scheduleData = parseCsv(scheduleText);
-
       const apiKey = '5b9a10e2092947d49dac84004ad149a2';
       const formId = '250955404825056';
       const roomFieldId = '18';
@@ -154,43 +153,49 @@
         .then(res => res.json())
         .then(json => json.content || []);
 
-      const sunday = new Date(monday);
-      sunday.setDate(monday.getDate() + 6);
+      const mondayDate = getMonday();
+      const sundayDate = new Date(mondayDate);
+      sundayDate.setDate(mondayDate.getDate() + 6);
 
-      const completedMap = {};
-      const resetMap = {};
+      const submissions = {};
+      const resetTimes = {};
 
-      submissionsData.forEach(sub => {
+      for (const sub of submissionsData) {
         const createdAt = new Date(sub.created_at);
-        if (createdAt < monday || createdAt > sunday) return;
+        const roomRaw = sub.answers?.[roomFieldId]?.answer?.trim() || '';
+        const roomClean = roomRaw.replace(/reset/i, '').trim();
 
-        let rawRoom = sub.answers?.[roomFieldId]?.answer?.trim();
-        if (!rawRoom) return;
+        if (!roomClean) continue;
 
-        const isReset = rawRoom.toLowerCase().includes("reset");
-        const room = rawRoom.replace(/reset/i, '').trim();
-        if (!room) return;
-
-        if (isReset) {
-          if (!resetMap[room] || createdAt > resetMap[room]) {
-            resetMap[room] = createdAt;
+        if (/reset/i.test(roomRaw)) {
+          if (!resetTimes[roomClean] || createdAt > resetTimes[roomClean]) {
+            resetTimes[roomClean] = createdAt;
           }
         } else {
-          if (!completedMap[room] || createdAt > new Date(completedMap[room].date)) {
-            completedMap[room] = {
-              date: createdAt,
-              display: createdAt.toLocaleString()
-            };
+          if (!submissions[roomClean] || createdAt > submissions[roomClean].date) {
+            submissions[roomClean] = { date: createdAt, raw: roomRaw };
           }
         }
-      });
+      }
+
+      const statusMap = {};
+      for (const room in submissions) {
+        if (!resetTimes[room] || submissions[room].date > resetTimes[room]) {
+          statusMap[room] = { completed: true, date: submissions[room].date };
+        }
+      }
+
+      const resetRooms = new Set();
+      for (const room in resetTimes) {
+        if (!submissions[room] || submissions[room].date <= resetTimes[room]) {
+          resetRooms.add(room);
+        }
+      }
 
       const grouped = {};
       function getName(initial) {
         return housekeeperNames[initial] || initial;
       }
-
-      const allRooms = [];
 
       for (const item of scheduleData) {
         const day = item.Day;
@@ -202,65 +207,54 @@
         if (!grouped[hkName]) grouped[hkName] = {};
         if (!grouped[hkName][day]) grouped[hkName][day] = [];
         grouped[hkName][day].push(room);
-        allRooms.push(room);
       }
 
-      const housekeepersWithRooms = Object.entries(grouped)
-        .map(([hkName, days]) => {
-          const filteredDays = {};
-          weekdayOrder.forEach(day => {
-            if (days[day]?.length) {
-              filteredDays[day] = days[day];
-            }
-          });
-          return [hkName, filteredDays];
-        })
-        .filter(([_, days]) => Object.keys(days).length > 0);
-
-      let completedCount = 0;
+      let totalRooms = 0, completedRooms = 0;
       let html = '';
 
-      housekeepersWithRooms.forEach(([hkName, days]) => {
+      Object.entries(grouped).forEach(([hkName, days]) => {
         html += `<h2>${hkName}</h2>`;
-        for (const day of Object.keys(days)) {
-          html += `<h3>${day}</h3><ul>`;
-          days[day].forEach(room => {
-            const completed = completedMap[room];
-            const reset = resetMap[room];
-            const wasReset = reset && (!completed || reset > completed.date);
-            const isCompleted = completed && (!reset || completed.date > reset);
+        weekdayOrder.forEach(day => {
+          if (days[day]?.length) {
+            html += `<h3>${day}</h3><ul>`;
+            days[day].forEach(room => {
+              totalRooms++;
+              let extra = '';
+              let cls = '';
 
-            let className = '';
-            let note = '';
+              if (statusMap[room]) {
+                completedRooms++;
+                cls = 'completed';
+                extra = ` - ${statusMap[room].date.toLocaleString()}`;
+              } else if (resetRooms.has(room)) {
+                cls = 'returned';
+                extra = ' - Returned to Schedule';
+              }
 
-            if (isCompleted) {
-              className = 'completed';
-              note = ` (Completed: ${completed.display})`;
-              completedCount++;
-            } else if (wasReset) {
-              className = 'reset';
-              note = ` (Returned to Schedule)`;
-            }
-
-            html += `<li class="${className}">${room}${note}</li>`;
-          });
-          html += `</ul>`;
-        }
+              html += `<li class="${cls}">${room}${extra}</li>`;
+            });
+            html += '</ul>';
+          }
+        });
       });
 
-      const percent = allRooms.length === 0 ? 0 : Math.round((completedCount / allRooms.length) * 100);
-      progressBar.style.width = percent + '%';
-      progressLabel.textContent = `Completion: ${percent}%`;
+      if (completedRooms === totalRooms) {
+        assignmentsDiv.innerHTML = `<p class="no-pending">All rooms are completed this week!</p>`;
+      }
 
-      assignmentsDiv.innerHTML = html;
+      assignmentsDiv.innerHTML += html;
+
+      const percent = totalRooms > 0 ? Math.round((completedRooms / totalRooms) * 100) : 100;
+      progressBar.style.width = percent + '%';
+      progressBar.textContent = percent + '%';
     }
 
-    document.getElementById('refresh-button').addEventListener('click', load);
-    setInterval(load, 60000);
     load().catch(err => {
       document.getElementById('assignments').innerHTML = `<p style="color:red;">Error loading assignments: ${err.message}</p>`;
       console.error(err);
     });
+
+    setInterval(() => location.reload(), 300000); // 5-minute auto refresh
   </script>
 </body>
 </html>
