@@ -1,86 +1,181 @@
-async function load() {
-  const assignmentsDiv = document.getElementById('assignments');
-
-  const scheduleResponse = await fetch('Colerain - Special Schedule.csv');
-  const scheduleText = await scheduleResponse.text();
-  const scheduleData = parseCsv(scheduleText);
-
-  const apiKey = '5b9a10e2092947d49dac84004ad149a2';
-  const formId = '250955404825056';
-  const roomFieldId = '18';
-
-  const submissionsData = await fetch(`https://api.jotform.com/form/${formId}/submissions?apiKey=${apiKey}&limit=1000`)
-    .then(res => res.json())
-    .then(json => json.content || []);
-
-  const monday = getMonday();
-  const sunday = new Date(monday);
-  sunday.setDate(monday.getDate() + 6);
-
-  // Build a map of room -> latest submission date
-  const completedRoomsMap = {};
-  submissionsData.forEach(sub => {
-    const createdAt = new Date(sub.created_at);
-    if (createdAt < monday || createdAt > sunday) return;
-
-    const room = sub.answers?.[roomFieldId]?.answer?.trim();
-    if (room) {
-      if (!completedRoomsMap[room] || new Date(completedRoomsMap[room]) < createdAt) {
-        completedRoomsMap[room] = createdAt.toLocaleString();
-      }
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Pending Room Assignments</title>
+  <style>
+    body {
+      font-family: sans-serif;
+      margin: 20px;
     }
-  });
+    h1 {
+      text-align: center;
+      margin-bottom: 1rem;
+    }
+    h2 {
+      margin-top: 2rem;
+      margin-bottom: 0.5rem;
+    }
+    h3 {
+      margin-left: 1rem;
+      margin-bottom: 0.25rem;
+      color: #333;
+    }
+    ul {
+      margin-left: 2rem;
+      margin-bottom: 1rem;
+      list-style-type: disc;
+    }
+    .no-pending {
+      text-align: center;
+      color: #666;
+      margin-top: 2rem;
+      font-style: italic;
+    }
+    .completed {
+      color: #228B22; /* Light green */
+      font-weight: bold;
+    }
+  </style>
+</head>
+<body>
+  <h1>Pending Room Assignments</h1>
+  <div id="assignments"></div>
 
-  // Group all assignments
-  const grouped = {};
-  function getName(initial) {
-    return housekeeperNames[initial] || initial;
-  }
+  <script>
+    const housekeeperNames = {
+      A: 'Brian',
+      B: 'Thomas',
+      C: 'Lisa'
+    };
 
-  for (const item of scheduleData) {
-    const day = item.Day;
-    const hkInitial = item.Housekeeper;
-    const room = item['Room Name'];
-    if (!day || !hkInitial || !room) continue;
+    const weekdayOrder = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
 
-    const hkName = getName(hkInitial);
-    if (!grouped[hkName]) grouped[hkName] = {};
-    if (!grouped[hkName][day]) grouped[hkName][day] = [];
-    grouped[hkName][day].push(room);
-  }
+    function parseCsv(text) {
+      const lines = text.trim().split('\n').filter(line => line.trim() !== '');
+      const headers = lines[0].split(/\t|,/).map(h => h.trim());
+      return lines.slice(1).map(line => {
+        const values = line.split(/\t|,/);
+        const obj = {};
+        headers.forEach((h, i) => obj[h] = values[i]?.trim() || '');
+        return obj;
+      });
+    }
 
-  // Prepare display
-  const housekeepersWithRooms = Object.entries(grouped)
-    .map(([hkName, days]) => {
-      const filteredDays = {};
-      weekdayOrder.forEach(day => {
-        if (days[day]?.length) {
-          filteredDays[day] = days[day];
+    function getMonday(date = new Date()) {
+      const d = new Date(date);
+      const day = d.getDay();
+      const diff = (day === 0 ? -6 : 1) - day;
+      d.setHours(0, 0, 0, 0);
+      d.setDate(d.getDate() + diff);
+      return d;
+    }
+
+    async function load() {
+      const assignmentsDiv = document.getElementById('assignments');
+
+      const scheduleResponse = await fetch('Colerain - Special Schedule.csv');
+      const scheduleText = await scheduleResponse.text();
+      const scheduleData = parseCsv(scheduleText);
+
+      const apiKey = '5b9a10e2092947d49dac84004ad149a2';
+      const formId = '250955404825056';
+      const roomFieldId = '18';
+      const spaceFieldId = '19'; // assuming this is the field for reset note
+
+      const submissionsData = await fetch(`https://api.jotform.com/form/${formId}/submissions?apiKey=${apiKey}&limit=1000`)
+        .then(res => res.json())
+        .then(json => json.content || []);
+
+      const monday = getMonday();
+      const sunday = new Date(monday);
+      sunday.setDate(monday.getDate() + 6);
+
+      const completedMap = {};
+      const resetMap = {};
+
+      submissionsData.forEach(sub => {
+        const createdAt = new Date(sub.created_at);
+        if (createdAt < monday || createdAt > sunday) return;
+
+        const room = sub.answers?.[roomFieldId]?.answer?.trim();
+        const spaceField = sub.answers?.[spaceFieldId]?.answer?.trim().toLowerCase();
+
+        if (room) {
+          if (spaceField && spaceField.includes("reset")) {
+            if (!resetMap[room] || createdAt > resetMap[room]) {
+              resetMap[room] = createdAt;
+            }
+          } else {
+            if (!completedMap[room] || createdAt > new Date(completedMap[room].date)) {
+              completedMap[room] = {
+                date: createdAt,
+                display: createdAt.toLocaleString()
+              };
+            }
+          }
         }
       });
-      return [hkName, filteredDays];
-    })
-    .filter(([_, days]) => Object.keys(days).length > 0);
 
-  if (housekeepersWithRooms.length === 0) {
-    assignmentsDiv.innerHTML = `<p class="no-pending">All rooms are completed this week!</p>`;
-    return;
-  }
+      const grouped = {};
+      function getName(initial) {
+        return housekeeperNames[initial] || initial;
+      }
 
-  let html = '';
-  housekeepersWithRooms.forEach(([hkName, days]) => {
-    html += `<h2>${hkName}</h2>`;
-    for (const day of Object.keys(days)) {
-      html += `<h3>${day}</h3><ul>`;
-      days[day].forEach(room => {
-        const submittedTime = completedRoomsMap[room];
-        const completed = submittedTime ? ` <span class="completed">(Completed: ${submittedTime})</span>` : '';
-        const roomClass = submittedTime ? 'completed' : '';
-        html += `<li class="${roomClass}">${room}${completed}</li>`;
+      for (const item of scheduleData) {
+        const day = item.Day;
+        const hkInitial = item.Housekeeper;
+        const room = item['Room Name'];
+        if (!day || !hkInitial || !room) continue;
+
+        const hkName = getName(hkInitial);
+        if (!grouped[hkName]) grouped[hkName] = {};
+        if (!grouped[hkName][day]) grouped[hkName][day] = [];
+        grouped[hkName][day].push(room);
+      }
+
+      const housekeepersWithRooms = Object.entries(grouped)
+        .map(([hkName, days]) => {
+          const filteredDays = {};
+          weekdayOrder.forEach(day => {
+            if (days[day]?.length) {
+              filteredDays[day] = days[day];
+            }
+          });
+          return [hkName, filteredDays];
+        })
+        .filter(([_, days]) => Object.keys(days).length > 0);
+
+      if (housekeepersWithRooms.length === 0) {
+        assignmentsDiv.innerHTML = `<p class="no-pending">All rooms are completed this week!</p>`;
+        return;
+      }
+
+      let html = '';
+      housekeepersWithRooms.forEach(([hkName, days]) => {
+        html += `<h2>${hkName}</h2>`;
+        for (const day of Object.keys(days)) {
+          html += `<h3>${day}</h3><ul>`;
+          days[day].forEach(room => {
+            const completed = completedMap[room];
+            const reset = resetMap[room];
+            const isCompleted = completed && (!reset || completed.date > reset);
+            const className = isCompleted ? 'completed' : '';
+            const note = isCompleted ? ` (Completed: ${completed.display})` : '';
+            html += `<li class="${className}">${room}${note}</li>`;
+          });
+          html += `</ul>`;
+        }
       });
-      html += `</ul>`;
-    }
-  });
 
-  assignmentsDiv.innerHTML = html;
-}
+      assignmentsDiv.innerHTML = html;
+    }
+
+    load().catch(err => {
+      document.getElementById('assignments').innerHTML = `<p style="color:red;">Error loading assignments: ${err.message}</p>`;
+      console.error(err);
+    });
+  </script>
+</body>
+</html>
