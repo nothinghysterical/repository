@@ -37,6 +37,10 @@
       color: #228B22;
       font-weight: bold;
     }
+    .reset {
+      color: #d35400;
+      font-style: italic;
+    }
     #progress-container {
       width: 100%;
       background: #eee;
@@ -55,10 +59,25 @@
       font-size: 0.9rem;
       margin-bottom: 0.5rem;
     }
+    #refresh-button {
+      display: block;
+      margin: 0 auto 1rem auto;
+      padding: 8px 16px;
+      font-size: 1rem;
+      border: none;
+      background-color: #007bff;
+      color: white;
+      border-radius: 5px;
+      cursor: pointer;
+    }
+    #refresh-button:hover {
+      background-color: #0056b3;
+    }
   </style>
 </head>
 <body>
   <h1>Pending Room Assignments</h1>
+  <button id="refresh-button">Refresh</button>
   <div id="progress-label">Completion: 0%</div>
   <div id="progress-container">
     <div id="progress-bar"></div>
@@ -122,7 +141,6 @@
 
         const isReset = rawRoom.toLowerCase().includes("reset");
         const room = rawRoom.replace(/reset/i, '').trim();
-
         if (!room) return;
 
         if (isReset) {
@@ -172,8 +190,8 @@
         .filter(([_, days]) => Object.keys(days).length > 0);
 
       let completedCount = 0;
-
       let html = '';
+
       housekeepersWithRooms.forEach(([hkName, days]) => {
         html += `<h2>${hkName}</h2>`;
         for (const day of Object.keys(days)) {
@@ -181,10 +199,21 @@
           days[day].forEach(room => {
             const completed = completedMap[room];
             const reset = resetMap[room];
+            const wasReset = reset && (!completed || reset > completed.date);
             const isCompleted = completed && (!reset || completed.date > reset);
-            if (isCompleted) completedCount++;
-            const className = isCompleted ? 'completed' : '';
-            const note = isCompleted ? ` (Completed: ${completed.display})` : '';
+
+            let className = '';
+            let note = '';
+
+            if (isCompleted) {
+              className = 'completed';
+              note = ` (Completed: ${completed.display})`;
+              completedCount++;
+            } else if (wasReset) {
+              className = 'reset';
+              note = ` (Returned to Schedule)`;
+            }
+
             html += `<li class="${className}">${room}${note}</li>`;
           });
           html += `</ul>`;
@@ -198,6 +227,13 @@
       assignmentsDiv.innerHTML = html;
     }
 
+    // Manual Refresh
+    document.getElementById('refresh-button').addEventListener('click', load);
+
+    // Auto Refresh every 60 seconds
+    setInterval(load, 60000);
+
+    // Initial Load
     load().catch(err => {
       document.getElementById('assignments').innerHTML = `<p style="color:red;">Error loading assignments: ${err.message}</p>`;
       console.error(err);
