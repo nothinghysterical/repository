@@ -5,71 +5,18 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Pending Room Assignments</title>
   <style>
-    body {
-      font-family: sans-serif;
-      margin: 20px;
-    }
-    h1 {
-      text-align: center;
-      margin-bottom: 1rem;
-    }
-    h2 {
-      margin-top: 2rem;
-      margin-bottom: 0.5rem;
-    }
-    h3 {
-      margin-left: 1rem;
-      margin-bottom: 0.25rem;
-      color: #333;
-    }
-    ul {
-      margin-left: 2rem;
-      margin-bottom: 1rem;
-      list-style-type: disc;
-    }
-    .no-pending {
-      text-align: center;
-      color: #666;
-      margin-top: 2rem;
-      font-style: italic;
-    }
-    .completed {
-      color: green;
-    }
-    .returned {
-      color: orange;
-    }
-    .progress-bar {
-      width: 100%;
-      background-color: #e0e0e0;
-      border-radius: 10px;
-      overflow: hidden;
-      margin-bottom: 1rem;
-    }
-    .progress-fill {
-      height: 20px;
-      background-color: #4caf50;
-      width: 0%;
-      transition: width 0.5s;
-      text-align: center;
-      color: white;
-      line-height: 20px;
-    }
-    .refresh-button {
-      display: inline-block;
-      margin: 0 auto 1rem;
-      padding: 0.5rem 1rem;
-      background-color: #007bff;
-      color: white;
-      border: none;
-      border-radius: 5px;
-      cursor: pointer;
-    }
-    .schedule-name {
-      text-align: center;
-      margin-top: 2rem;
-      color: #666;
-    }
+    body { font-family: sans-serif; margin: 20px; }
+    h1 { text-align: center; margin-bottom: 1rem; }
+    h2 { margin-top: 2rem; margin-bottom: 0.5rem; }
+    h3 { margin-left: 1rem; margin-bottom: 0.25rem; color: #333; }
+    ul { margin-left: 2rem; margin-bottom: 1rem; list-style-type: disc; }
+    .no-pending { text-align: center; color: #666; margin-top: 2rem; font-style: italic; }
+    .completed { color: green; }
+    .returned { color: orange; }
+    .progress-bar { width: 100%; background-color: #e0e0e0; border-radius: 10px; overflow: hidden; margin-bottom: 1rem; }
+    .progress-fill { height: 20px; background-color: #4caf50; width: 0%; transition: width 0.5s; text-align: center; color: white; line-height: 20px; }
+    .refresh-button { display: inline-block; margin: 0 auto 1rem; padding: 0.5rem 1rem; background-color: #007bff; color: white; border: none; border-radius: 5px; cursor: pointer; }
+    .schedule-name { text-align: center; margin-top: 2rem; color: #666; }
   </style>
 </head>
 <body>
@@ -116,22 +63,17 @@
       return mondayCount;
     }
 
-    function isDateInCurrentWeek(date) {
-      const monday = getMonday();
-      const sunday = new Date(monday);
-      sunday.setDate(monday.getDate() + 6);
-      return date >= monday && date <= sunday;
-    }
-
     async function load() {
       const assignmentsDiv = document.getElementById('assignments');
       const progressBar = document.getElementById('progress');
       const scheduleNameDiv = document.getElementById('scheduleName');
 
       const monday = getMonday();
-      const weekNumber = getWeekOfMonth(monday);
-      const scheduleFilename = `schedules/Colerain-Week${weekNumber}.csv`;
+      const sunday = new Date(monday);
+      sunday.setDate(monday.getDate() + 6);
 
+      const weekNumber = getWeekOfMonth(monday);
+      const scheduleFilename = `/schedules/Colerain-Week${weekNumber}.csv`;
       scheduleNameDiv.textContent = `Schedule: Colerain-Week${weekNumber}`;
 
       let scheduleText;
@@ -153,41 +95,39 @@
         .then(res => res.json())
         .then(json => json.content || []);
 
-      const mondayDate = getMonday();
-      const sundayDate = new Date(mondayDate);
-      sundayDate.setDate(mondayDate.getDate() + 6);
-
-      const submissions = {};
       const resetTimes = {};
+      const validSubmissions = {};
 
       for (const sub of submissionsData) {
         const createdAt = new Date(sub.created_at);
         const roomRaw = sub.answers?.[roomFieldId]?.answer?.trim() || '';
-        const roomClean = roomRaw.replace(/reset/i, '').trim();
+        const roomName = roomRaw.replace(/reset/i, '').trim();
+        if (!roomName) continue;
 
-        if (!roomClean) continue;
+        if (createdAt < monday || createdAt > sunday) continue;
 
         if (/reset/i.test(roomRaw)) {
-          if (!resetTimes[roomClean] || createdAt > resetTimes[roomClean]) {
-            resetTimes[roomClean] = createdAt;
+          if (!resetTimes[roomName] || createdAt > resetTimes[roomName]) {
+            resetTimes[roomName] = createdAt;
           }
         } else {
-          if (!submissions[roomClean] || createdAt > submissions[roomClean].date) {
-            submissions[roomClean] = { date: createdAt, raw: roomRaw };
+          if (!validSubmissions[roomName] || createdAt > validSubmissions[roomName].date) {
+            validSubmissions[roomName] = { date: createdAt, raw: roomRaw };
           }
         }
       }
 
       const statusMap = {};
-      for (const room in submissions) {
-        if (!resetTimes[room] || submissions[room].date > resetTimes[room]) {
-          statusMap[room] = { completed: true, date: submissions[room].date };
+      for (const room in validSubmissions) {
+        const submissionDate = validSubmissions[room].date;
+        if (!resetTimes[room] || submissionDate > resetTimes[room]) {
+          statusMap[room] = { completed: true, date: submissionDate };
         }
       }
 
       const resetRooms = new Set();
       for (const room in resetTimes) {
-        if (!submissions[room] || submissions[room].date <= resetTimes[room]) {
+        if (!statusMap[room]) {
           resetRooms.add(room);
         }
       }
@@ -254,7 +194,7 @@
       console.error(err);
     });
 
-    setInterval(() => location.reload(), 300000); // 5-minute auto refresh
+    setInterval(() => location.reload(), 300000); // Refresh every 5 minutes
   </script>
 </body>
 </html>
