@@ -108,13 +108,32 @@
       return d;
     }
 
+    function getWeekOfMonth(mondayDate) {
+      const firstOfMonth = new Date(mondayDate.getFullYear(), mondayDate.getMonth(), 1);
+      const firstMonday = getMonday(firstOfMonth);
+      const weekNumber = Math.floor((mondayDate - firstMonday) / (7 * 24 * 60 * 60 * 1000)) + 1;
+      return Math.max(1, weekNumber);
+    }
+
     async function load() {
       const assignmentsDiv = document.getElementById('assignments');
       const progressBar = document.getElementById('progress-bar');
       const progressLabel = document.getElementById('progress-label');
 
-      const scheduleResponse = await fetch('Colerain - Special Schedule.csv');
-      const scheduleText = await scheduleResponse.text();
+      const monday = getMonday();
+      const weekNumber = getWeekOfMonth(monday);
+      const scheduleFilename = `/schedules/Colerain-Week${weekNumber}.csv`;
+
+      let scheduleText;
+      try {
+        const scheduleResponse = await fetch(scheduleFilename);
+        if (!scheduleResponse.ok) throw new Error(`File not found: ${scheduleFilename}`);
+        scheduleText = await scheduleResponse.text();
+      } catch (err) {
+        assignmentsDiv.innerHTML = `<p style="color:red;">Could not load schedule file: ${err.message}</p>`;
+        return;
+      }
+
       const scheduleData = parseCsv(scheduleText);
 
       const apiKey = '5b9a10e2092947d49dac84004ad149a2';
@@ -125,7 +144,6 @@
         .then(res => res.json())
         .then(json => json.content || []);
 
-      const monday = getMonday();
       const sunday = new Date(monday);
       sunday.setDate(monday.getDate() + 6);
 
