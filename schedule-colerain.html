@@ -73,6 +73,12 @@
     #refresh-button:hover {
       background-color: #0056b3;
     }
+    #schedule-name {
+      text-align: center;
+      font-size: 0.9rem;
+      color: #888;
+      margin-top: 2rem;
+    }
   </style>
 </head>
 <body>
@@ -83,6 +89,7 @@
     <div id="progress-bar"></div>
   </div>
   <div id="assignments"></div>
+  <div id="schedule-name"></div>
 
   <script>
     const housekeeperNames = { A: 'Brian', B: 'Thomas', C: 'Lisa' };
@@ -119,10 +126,13 @@
       const assignmentsDiv = document.getElementById('assignments');
       const progressBar = document.getElementById('progress-bar');
       const progressLabel = document.getElementById('progress-label');
+      const scheduleNameDiv = document.getElementById('schedule-name');
 
       const monday = getMonday();
       const weekNumber = getWeekOfMonth(monday);
       const scheduleFilename = `/schedules/Colerain-Week${weekNumber}.csv`;
+
+      scheduleNameDiv.textContent = `Using schedule: ${scheduleFilename.replace('/schedules/', '')}`;
 
       let scheduleText;
       try {
@@ -245,13 +255,8 @@
       assignmentsDiv.innerHTML = html;
     }
 
-    // Manual Refresh
     document.getElementById('refresh-button').addEventListener('click', load);
-
-    // Auto Refresh every 60 seconds
     setInterval(load, 60000);
-
-    // Initial Load
     load().catch(err => {
       document.getElementById('assignments').innerHTML = `<p style="color:red;">Error loading assignments: ${err.message}</p>`;
       console.error(err);
