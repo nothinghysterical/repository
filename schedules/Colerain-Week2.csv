@@ -1,0 +1,74 @@
+Day	Housekeeper	Room Name	Completion Time
+Monday	C	Room 320	30
+Monday	C	Room 323	30
+Monday	C	Room 326	30
+Monday	C	Room 328	30
+Monday	A	Hallway 72-3	60
+Monday	C	Bathroom 72-3-1	45
+Monday	C	Bathroom 72-3-2	45
+Monday	A	Entrance A Stairs	30
+Monday	A	Entrance A	30
+Tuesday	C	Room 220	30
+Tuesday	A	Kitchen 72-2	30
+Tuesday	A	Hallway 72-2	60
+Tuesday	C	Bathroom 72-2-1	45
+Tuesday	C	Bathroom 72-2-2	45
+Tuesday	A	Room Zone	120
+Tuesday	A	Bathroom Zone	45
+Wednesday	A	Hallway 72-1	60
+Wednesday	C	Room 124	30
+Wednesday	C	Room 127	30
+Wednesday	C	Room 128	30
+Wednesday	C	Room 130	30
+Wednesday	C	Bathroom 72-1-1	45
+Wednesday	C	Bathroom 72-1-2	45
+Wednesday	C	Bathroom 127	45
+Wednesday	C	Bathroom 128	45
+Wednesday	A	Stairwell F	30
+Wednesday	A	Entrance F	30
+Friday	B	Room Office	120
+Friday	B	Room Conference	30
+Friday	B	Kitchen Office	30
+Friday	B	Room Meet 1	15
+Friday	B	Room Meet 2	15
+Friday	B	Room Meet 3	15
+Wednesday	B	Studio	15
+Wednesday	B	Stairwell C	
+Wednesday	B	Stairwell D	
+Monday	B	Hallway FH1	60
+Monday	B	Hallway FH2	60
+Monday	B	Room 108-110	60
+Monday	B	Room 113	30
+Monday	B	Room 112	30
+Monday	B	Room 111	30
+Monday	B	Kitchen 92-1	60
+Monday	B	Room 102	30
+Monday	B	Room 103	30
+Monday	B	Room 104	30
+Monday	B	Bathroom 102	45
+Monday	B	Bathroom 92-1-1	45
+Monday	B	Bathroom 92-2-2	45
+Tuesday	B	Room 118	30
+Tuesday	B	Bathroom 118	45
+Tuesday	B	Entrance E	30
+Tuesday	B	Hallway 92-1	60
+Wednesday	B	Stairwell E	30
+Tuesday	B	Room 120	30
+Wednesday	B	Stairwell B	30
+Wednesday	B	Worship Center (Lower)	120
+Wednesday	B	Worship Center (Upper)	60
+Thursday	B	Bathroom 92-2-1	45
+Thursday	B	Bathroom 92-2-2	45
+Thursday	B	Bathroom 92-3-1	45
+Thursday	B	Bathroom 92-3-2	45
+Wednesday	B	Hallway 92-2	60
+Wednesday	B	Hallway 92-3	60
+Thursday	B	Room 250	30
+Thursday	B	Room 254	30
+Thursday	B	Room 255	30
+Thursday	B	Hallway 25-2	60
+Friday	A	Hallway 25-1	60
+Thursday	B	Bathroom 25-2-1	45
+Thursday	B	Bathroom 25-2-2	45
+Thursday	A	Gym (Lower)	60
+Thursday	A	Gym (Upper)	60
