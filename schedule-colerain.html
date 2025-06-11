@@ -11,7 +11,7 @@
     }
     h1 {
       text-align: center;
-      margin-bottom: 1rem;
+      margin-bottom: 0.5rem;
     }
     h2 {
       margin-top: 2rem;
@@ -34,153 +34,58 @@
       font-style: italic;
     }
     .completed {
-      color: #228B22; /* Light green */
+      color: #228B22;
       font-weight: bold;
+    }
+    .reset {
+      font-style: italic;
+      color: #cc0000;
+    }
+    #progress-container {
+      width: 100%;
+      background: #eee;
+      border-radius: 10px;
+      overflow: hidden;
+      margin: 1rem 0;
+    }
+    #progress-bar {
+      height: 20px;
+      background: #4caf50;
+      width: 0%;
+      transition: width 0.5s ease;
+    }
+    #progress-label {
+      text-align: center;
+      font-size: 0.9rem;
+      margin-bottom: 0.5rem;
+    }
+    #refresh-container {
+      text-align: center;
+      margin-bottom: 1rem;
+    }
+    #refresh-button {
+      padding: 6px 12px;
+      font-size: 0.9rem;
+      background-color: #007BFF;
+      color: white;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+    #refresh-button:hover {
+      background-color: #0056b3;
     }
   </style>
 </head>
 <body>
   <h1>Pending Room Assignments</h1>
+  <div id="refresh-container">
+    <button id="refresh-button" onclick="load()">🔄 Refresh</button>
+  </div>
+  <div id="progress-label">Completion: 0%</div>
+  <div id="progress-container">
+    <div id="progress-bar"></div>
+  </div>
   <div id="assignments"></div>
 
   <script>
-    const housekeeperNames = {
-      A: 'Brian',
-      B: 'Thomas',
-      C: 'Lisa'
-    };
-
-    const weekdayOrder = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
-
-    function parseCsv(text) {
-      const lines = text.trim().split('\n').filter(line => line.trim() !== '');
-      const headers = lines[0].split(/\t|,/).map(h => h.trim());
-      return lines.slice(1).map(line => {
-        const values = line.split(/\t|,/);
-        const obj = {};
-        headers.forEach((h, i) => obj[h] = values[i]?.trim() || '');
-        return obj;
-      });
-    }
-
-    function getMonday(date = new Date()) {
-      const d = new Date(date);
-      const day = d.getDay();
-      const diff = (day === 0 ? -6 : 1) - day;
-      d.setHours(0, 0, 0, 0);
-      d.setDate(d.getDate() + diff);
-      return d;
-    }
-
-    async function load() {
-      const assignmentsDiv = document.getElementById('assignments');
-
-      const scheduleResponse = await fetch('Colerain - Special Schedule.csv');
-      const scheduleText = await scheduleResponse.text();
-      const scheduleData = parseCsv(scheduleText);
-
-      const apiKey = '5b9a10e2092947d49dac84004ad149a2';
-      const formId = '250955404825056';
-      const roomFieldId = '18';
-
-      const submissionsData = await fetch(`https://api.jotform.com/form/${formId}/submissions?apiKey=${apiKey}&limit=1000`)
-        .then(res => res.json())
-        .then(json => json.content || []);
-
-      const monday = getMonday();
-      const sunday = new Date(monday);
-      sunday.setDate(monday.getDate() + 6);
-
-      const completedMap = {};
-      const resetMap = {};
-
-      submissionsData.forEach(sub => {
-        const createdAt = new Date(sub.created_at);
-        if (createdAt < monday || createdAt > sunday) return;
-
-        let rawRoom = sub.answers?.[roomFieldId]?.answer?.trim();
-        if (!rawRoom) return;
-
-        const lower = rawRoom.toLowerCase();
-        const isReset = lower.includes("reset");
-
-        // Extract base room name by removing "reset"
-        const room = rawRoom.replace(/reset/i, '').trim();
-
-        if (!room) return;
-
-        if (isReset) {
-          if (!resetMap[room] || createdAt > resetMap[room]) {
-            resetMap[room] = createdAt;
-          }
-        } else {
-          if (!completedMap[room] || createdAt > new Date(completedMap[room].date)) {
-            completedMap[room] = {
-              date: createdAt,
-              display: createdAt.toLocaleString()
-            };
-          }
-        }
-      });
-
-      const grouped = {};
-      function getName(initial) {
-        return housekeeperNames[initial] || initial;
-      }
-
-      for (const item of scheduleData) {
-        const day = item.Day;
-        const hkInitial = item.Housekeeper;
-        const room = item['Room Name'];
-        if (!day || !hkInitial || !room) continue;
-
-        const hkName = getName(hkInitial);
-        if (!grouped[hkName]) grouped[hkName] = {};
-        if (!grouped[hkName][day]) grouped[hkName][day] = [];
-        grouped[hkName][day].push(room);
-      }
-
-      const housekeepersWithRooms = Object.entries(grouped)
-        .map(([hkName, days]) => {
-          const filteredDays = {};
-          weekdayOrder.forEach(day => {
-            if (days[day]?.length) {
-              filteredDays[day] = days[day];
-            }
-          });
-          return [hkName, filteredDays];
-        })
-        .filter(([_, days]) => Object.keys(days).length > 0);
-
-      if (housekeepersWithRooms.length === 0) {
-        assignmentsDiv.innerHTML = `<p class="no-pending">All rooms are completed this week!</p>`;
-        return;
-      }
-
-      let html = '';
-      housekeepersWithRooms.forEach(([hkName, days]) => {
-        html += `<h2>${hkName}</h2>`;
-        for (const day of Object.keys(days)) {
-          html += `<h3>${day}</h3><ul>`;
-          days[day].forEach(room => {
-            const completed = completedMap[room];
-            const reset = resetMap[room];
-            const isCompleted = completed && (!reset || completed.date > reset);
-            const className = isCompleted ? 'completed' : '';
-            const note = isCompleted ? ` (Completed: ${completed.display})` : '';
-            html += `<li class="${className}">${room}${note}</li>`;
-          });
-          html += `</ul>`;
-        }
-      });
-
-      assignmentsDiv.innerHTML = html;
-    }
-
-    load().catch(err => {
-      document.getElementById('assignments').innerHTML = `<p style="color:red;">Error loading assignments: ${err.message}</p>`;
-      console.error(err);
-    });
-  </script>
-</body>
-</html>
