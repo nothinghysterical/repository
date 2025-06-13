@@ -1,4 +1,7 @@
 Day	Housekeeper	Room Name	Completion Time
+Monday	D	72 Building Trash	30
+Monday	D	25/52 Building Trash	30
+Monday	B	92 Building Trash	30
 Monday	D	Room 320	30
 Monday	D	Room 323	30
 Monday	D	Room 326	30
@@ -66,6 +69,7 @@ Thursday	B	Bathroom 92-3-1	45
 Thursday	B	Bathroom 92-3-2	45
 Wednesday	B	Hallway 92-2	60
 Wednesday	B	Hallway 92-3	60
+Thursday	B	Room 250	30
 Thursday	B	Room 254	30
 Thursday	B	Room 255	30
 Thursday	B	Hallway 25-2	60
