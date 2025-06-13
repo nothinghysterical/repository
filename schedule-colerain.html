@@ -9,11 +9,28 @@
     h1 { text-align: center; margin-bottom: 1rem; }
     h2 { margin-top: 2rem; margin-bottom: 0.5rem; }
     h3 { margin-left: 1rem; margin-bottom: 0.25rem; color: #333; }
-    ul { margin-left: 2rem; margin-bottom: 1rem; list-style-type: disc; }
-    .no-pending { text-align: center; color: #666; margin-top: 2rem; font-style: italic; }
+    ul { margin-left: 2rem; margin-bottom: 1rem; list-style-type: none; padding-left: 1rem; }
+    li { margin-bottom: 0.25rem; }
+
     .completed { color: green; }
+    .completed::before {
+      content: "✓ ";
+      color: green;
+      font-weight: bold;
+      margin-right: 0.25rem;
+    }
+
     .returned { color: orange; }
+    .returned::before {
+      content: "↺ ";
+      color: orange;
+      font-weight: bold;
+      margin-right: 0.25rem;
+    }
+
     .pending { font-weight: bold; }
+
+    .no-pending { text-align: center; color: #666; margin-top: 2rem; font-style: italic; }
     .progress-bar { width: 100%; background-color: #e0e0e0; border-radius: 10px; overflow: hidden; margin-bottom: 1rem; }
     .progress-fill { height: 20px; background-color: #4caf50; width: 0%; transition: width 0.5s; text-align: center; color: white; line-height: 20px; }
     .refresh-button { display: inline-block; margin: 0 auto 1rem; padding: 0.5rem 1rem; background-color: #007bff; color: white; border: none; border-radius: 5px; cursor: pointer; }
