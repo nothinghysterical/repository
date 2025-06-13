@@ -13,6 +13,7 @@
     .no-pending { text-align: center; color: #666; margin-top: 2rem; font-style: italic; }
     .completed { color: green; }
     .returned { color: orange; }
+    .pending { font-weight: bold; }
     .progress-bar { width: 100%; background-color: #e0e0e0; border-radius: 10px; overflow: hidden; margin-bottom: 1rem; }
     .progress-fill { height: 20px; background-color: #4caf50; width: 0%; transition: width 0.5s; text-align: center; color: white; line-height: 20px; }
     .refresh-button { display: inline-block; margin: 0 auto 1rem; padding: 0.5rem 1rem; background-color: #007bff; color: white; border: none; border-radius: 5px; cursor: pointer; }
@@ -169,6 +170,8 @@
               } else if (resetRooms.has(room)) {
                 cls = 'returned';
                 extra = ' - Returned to Schedule';
+              } else {
+                cls = 'pending';
               }
 
               html += `<li class="${cls}">${room}${extra}</li>`;
