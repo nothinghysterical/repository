@@ -50,7 +50,6 @@ Monday	D	Kitchen 92-1	60
 Monday	D	Janitorial 92-1	20
 Monday	D	Room 102	30
 Monday	D	Room 103	30
-Monday	D	Room 104	30
 Monday	D	Bathroom 102	45
 Monday	D	Bathroom 92-1-1	45
 Monday	D	Bathroom 92-1-2	45
@@ -59,7 +58,6 @@ Tuesday	D	Bathroom 118	45
 Tuesday	D	Entrance E	30
 Tuesday	D	Hallway 92-1	60
 Wednesday	D	Stairwell E	30
-Tuesday	D	Room 120	30
 Wednesday	D	Stairwell B	30
 Wednesday	D	Worship Center	120
 Wednesday	D	Worship Center Balcony	60
@@ -69,7 +67,6 @@ Thursday	D	Bathroom 92-3-1	45
 Thursday	D	Bathroom 92-3-2	45
 Wednesday	D	Hallway 92-2	60
 Wednesday	D	Hallway 92-3	60
-Thursday	D	Room 250	30
 Thursday	D	Room 254	30
 Thursday	D	Room 255	30
 Thursday	D	Hallway 25-2	60
