@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>10-Week Room Summary by Housekeeper</title>
+  <style>
+    body { font-family: sans-serif; padding: 20px; }
+    h1 { text-align: center; }
+    h2 { margin-top: 2rem; }
+    h3 { margin: 1rem 0 0.5rem; }
+    ul { list-style-type: none; padding-left: 1rem; }
+    li { margin: 0.25rem 0; }
+
+    .completed { color: green; }
+    .completed::before { content: "✓ "; font-weight: bold; }
+
+    .returned { color: orange; font-weight: bold; }
+    .returned::before { content: "↺ "; }
+
+    .pending { color: red; font-weight: bold; }
+    .pending::before { content: "❌ "; }
+  </style>
+</head>
+<body>
+  <h1>Last 10 Weeks – Room Summary by Housekeeper</h1>
+  <div id="summary"></div>
+
+  <script>
+    const housekeeperNames = { A: 'Brian', B: 'Thomas', C: 'Lisa', D: 'Garrett' };
+    const roomFieldId = '18';
+    const formId = '250955404825056';
+    const apiKey = '5b9a10e2092947d49dac84004ad149a2';
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    function getMonday(date) {
+      const d = new Date(date);
+      const day = d.getDay();
+      const diff = (day === 0 ? -6 : 1) - day;
+      d.setDate(d.getDate() + diff);
+      return new Date(d.getFullYear(), d.getMonth(), d.getDate());
+    }
+
+    function getWeekNumber(date) {
+      const monday = getMonday(date);
+      const firstOfMonth = new Date(monday.getFullYear(), monday.getMonth(), 1);
+      let week = 0;
+      for (let d = new Date(firstOfMonth); d <= monday; d.setDate(d.getDate() + 1)) {
+        if (d.getDay() === 1) week++;
+      }
+      return week;
+    }
+
+    async function fetchSubmissions(fromDate, toDate) {
+      const url = `https://api.jotform.com/form/${formId}/submissions?apiKey=${apiKey}&limit=1000`;
+      const response = await fetch(url);
+      const data = await response.json();
+      const submissions = data.content || [];
+
+      const cleaned = {};
+      const resets = {};
+
+      for (const sub of submissions) {
+        const created = new Date(sub.created_at);
+        const raw = sub.answers?.[roomFieldId]?.answer?.trim() || '';
+        const room = raw.replace(/reset/i, '').trim();
+
+        if (!room || created < fromDate || created > toDate) continue;
+
+        if (/reset/i.test(raw)) {
+          if (!resets[room] || created > resets[room]) resets[room] = created;
+        } else {
+          if (!cleaned[room] || created > cleaned[room]) cleaned[room] = created;
+        }
+      }
+
+      return { cleaned, resets };
+    }
+
+    function parseCsv(text) {
+      const lines = text.trim().split('\n').filter(Boolean);
+      const headers = lines[0].split(/,|\t/).map(h => h.trim());
+      return lines.slice(1).map(line => {
+        const values = line.split(/,|\t/);
+        const obj = {};
+        headers.forEach((h, i) => obj[h] = values[i]?.trim() || '');
+        return obj;
+      });
+    }
+
+    async function summarizeWeeks() {
+      const container = document.getElementById('summary');
+      const summaries = {};
+
+      for (let i = 0; i < 10; i++) {
+        const date = new Date(today);
+        date.setDate(today.getDate() - i * 7);
+        const monday = getMonday(date);
+        const sunday = new Date(monday);
+        sunday.setDate(monday.getDate() + 6);
+        const week = getWeekNumber(monday);
+        const filename = `schedules/Colerain-Week${week}.csv`;
+
+        let text;
+        try {
+          const res = await fetch(filename);
+          if (!res.ok) continue;
+          text = await res.text();
+        } catch {
+          continue;
+        }
+
+        const rows = parseCsv(text);
+        const { cleaned, resets } = await fetchSubmissions(monday, sunday);
+
+        for (const row of rows) {
+          const hk = housekeeperNames[row.Housekeeper] || row.Housekeeper;
+          const room = row['Room Name'];
+          const key = `Week ${week} (${monday.toLocaleDateString()})`;
+
+          if (!summaries[hk]) summaries[hk] = {};
+          if (!summaries[hk][key]) summaries[hk][key] = [];
+
+          if (cleaned[room] && (!resets[room] || cleaned[room] > resets[room])) {
+            summaries[hk][key].push({ room, status: 'completed' });
+          } else if (resets[room]) {
+            summaries[hk][key].push({ room, status: 'returned' });
+          } else {
+            summaries[hk][key].push({ room, status: 'pending' });
+          }
+        }
+      }
+
+      for (const [hk, weeks] of Object.entries(summaries)) {
+        container.innerHTML += `<h2>${hk}</h2>`;
+        for (const [weekLabel, items] of Object.entries(weeks)) {
+          container.innerHTML += `<h3>${weekLabel}</h3><ul>`;
+          for (const { room, status } of items) {
+            container.innerHTML += `<li class="${status}">${room}</li>`;
+          }
+          container.innerHTML += `</ul>`;
+        }
+      }
+    }
+
+    summarizeWeeks();
+  </script>
+</body>
+</html>
