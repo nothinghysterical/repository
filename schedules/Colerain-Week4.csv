@@ -50,7 +50,6 @@ Monday	B	Kitchen 92-1	60
 Monday	B	Janitorial 92-1	20
 Monday	B	Room 102	30
 Monday	B	Room 103	30
-Monday	B	Room 104	30
 Monday	B	Bathroom 102	45
 Monday	B	Bathroom 92-1-1	45
 Monday	B	Bathroom 92-1-2	45
@@ -59,7 +58,6 @@ Tuesday	B	Bathroom 118	45
 Tuesday	B	Entrance E	30
 Tuesday	B	Hallway 92-1	60
 Wednesday	B	Stairwell E	30
-Tuesday	B	Room 120	30
 Wednesday	B	Stairwell B	30
 Wednesday	B	Worship Center	120
 Wednesday	B	Worship Center Balcony	60
@@ -69,7 +67,6 @@ Thursday	B	Bathroom 92-3-1	45
 Thursday	B	Bathroom 92-3-2	45
 Wednesday	B	Hallway 92-2	60
 Wednesday	B	Hallway 92-3	60
-Thursday	B	Room 250	30
 Thursday	B	Room 254	30
 Thursday	B	Room 255	30
 Thursday	B	Hallway 25-2	60
