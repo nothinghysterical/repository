@@ -2,7 +2,6 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>10-Week Room Summary by Housekeeper</title>
   <style>
     body { font-family: sans-serif; padding: 20px; }
@@ -14,17 +13,15 @@
 
     .completed { color: green; }
     .completed::before { content: "✓ "; font-weight: bold; }
-
     .returned { color: orange; font-weight: bold; }
     .returned::before { content: "↺ "; }
-
     .pending { color: red; font-weight: bold; }
     .pending::before { content: "❌ "; }
   </style>
 </head>
 <body>
   <h1>Last 10 Weeks – Room Summary by Housekeeper</h1>
-  <div id="summary"></div>
+  <div id="summary">Loading...</div>
 
   <script>
     const housekeeperNames = { A: 'Brian', B: 'Thomas', C: 'Lisa', D: 'Garrett' };
@@ -55,8 +52,8 @@
 
     async function fetchSubmissions(fromDate, toDate) {
       const url = `https://api.jotform.com/form/${formId}/submissions?apiKey=${apiKey}&limit=1000`;
-      const response = await fetch(url);
-      const data = await response.json();
+      const res = await fetch(url);
+      const data = await res.json();
       const submissions = data.content || [];
 
       const cleaned = {};
@@ -66,7 +63,6 @@
         const created = new Date(sub.created_at);
         const raw = sub.answers?.[roomFieldId]?.answer?.trim() || '';
         const room = raw.replace(/reset/i, '').trim();
-
         if (!room || created < fromDate || created > toDate) continue;
 
         if (/reset/i.test(raw)) {
@@ -92,7 +88,11 @@
 
     async function summarizeWeeks() {
       const container = document.getElementById('summary');
+      container.innerHTML = "<p>Loading schedule data...</p>";
       const summaries = {};
+      const submissionData = await fetchSubmissions(
+        new Date(today.getTime() - 70 * 24 * 60 * 60 * 1000), today
+      );
 
       for (let i = 0; i < 10; i++) {
         const date = new Date(today);
@@ -113,35 +113,41 @@
         }
 
         const rows = parseCsv(text);
-        const { cleaned, resets } = await fetchSubmissions(monday, sunday);
-
         for (const row of rows) {
           const hk = housekeeperNames[row.Housekeeper] || row.Housekeeper;
           const room = row['Room Name'];
-          const key = `Week ${week} (${monday.toLocaleDateString()})`;
-
+          const label = `Week ${week} (${monday.toLocaleDateString()})`;
           if (!summaries[hk]) summaries[hk] = {};
-          if (!summaries[hk][key]) summaries[hk][key] = [];
+          if (!summaries[hk][label]) summaries[hk][label] = [];
 
-          if (cleaned[room] && (!resets[room] || cleaned[room] > resets[room])) {
-            summaries[hk][key].push({ room, status: 'completed' });
-          } else if (resets[room]) {
-            summaries[hk][key].push({ room, status: 'returned' });
+          const cleanedDate = submissionData.cleaned[room];
+          const resetDate = submissionData.resets[room];
+
+          if (cleanedDate && (!resetDate || cleanedDate > resetDate)) {
+            summaries[hk][label].push({ room, status: 'completed' });
+          } else if (resetDate) {
+            summaries[hk][label].push({ room, status: 'returned' });
           } else {
-            summaries[hk][key].push({ room, status: 'pending' });
+            summaries[hk][label].push({ room, status: 'pending' });
           }
         }
       }
 
+      container.innerHTML = '';
+
       for (const [hk, weeks] of Object.entries(summaries)) {
         container.innerHTML += `<h2>${hk}</h2>`;
-        for (const [weekLabel, items] of Object.entries(weeks)) {
-          container.innerHTML += `<h3>${weekLabel}</h3><ul>`;
-          for (const { room, status } of items) {
+        for (const [label, rooms] of Object.entries(weeks)) {
+          container.innerHTML += `<h3>${label}</h3><ul>`;
+          for (const { room, status } of rooms) {
             container.innerHTML += `<li class="${status}">${room}</li>`;
           }
-          container.innerHTML += `</ul>`;
+          container.innerHTML += '</ul>';
         }
+      }
+
+      if (container.innerHTML === '') {
+        container.innerHTML = "<p>No schedule or submission data available for the last 10 weeks.</p>";
       }
     }
 
