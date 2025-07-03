@@ -9,9 +9,10 @@
     h1, h2 { text-align: center; }
     .campus-section { margin-top: 2rem; }
     .week-section { margin-top: 1rem; }
+    .housekeeper-section { margin-left: 1rem; }
     ul { margin-left: 2rem; list-style-type: disc; }
     li { margin-bottom: 0.25rem; }
-    .none { color: green; font-style: italic; }
+    .none { color: green; font-style: italic; margin-left: 1rem; }
     .error { color: red; font-weight: bold; }
   </style>
 </head>
@@ -26,6 +27,7 @@
     const formId = '250955404825056';
     const roomFieldId = '18';
     const apiKey = '5b9a10e2092947d49dac84004ad149a2';
+    const housekeeperNames = { A: 'Brian', B: 'Thomas', C: 'Lisa', D: 'Garrett' };
 
     function getPreviousMondays(count) {
       const mondays = [];
@@ -112,7 +114,16 @@
           }
 
           const data = parseCsv(csv);
-          const scheduledRooms = new Set(data.map(d => d['Room Name']).filter(Boolean));
+          const grouped = {};
+
+          data.forEach(row => {
+            const hk = housekeeperNames[row.Housekeeper] || row.Housekeeper;
+            const room = row['Room Name'];
+            if (!hk || !room) return;
+            if (!grouped[hk]) grouped[hk] = new Set();
+            grouped[hk].add(room);
+          });
+
           const valid = {};
           const reset = {};
 
@@ -120,7 +131,6 @@
             if (sub.date < monday || sub.date > sunday) continue;
             const name = sub.roomRaw.replace(/reset/i, '').trim();
             if (!name) continue;
-
             if (/reset/i.test(sub.roomRaw)) {
               reset[name] = sub.date;
             } else {
@@ -128,31 +138,43 @@
             }
           }
 
-          const missedRooms = [];
-          for (const room of scheduledRooms) {
-            if (!valid[room] && !reset[room]) {
-              missedRooms.push(room);
+          const missedByHK = {};
+          for (const hk in grouped) {
+            for (const room of grouped[hk]) {
+              if (!valid[room] && !reset[room]) {
+                if (!missedByHK[hk]) missedByHK[hk] = [];
+                missedByHK[hk].push(room);
+              }
             }
           }
 
           missedSummary[campus].push({
             week: `Week ${weekNumber}`,
-            missed: missedRooms
+            missed: missedByHK
           });
         }
       }
 
-      // Render the result
+      // Render
       for (const campus of campuses) {
         summaryDiv.innerHTML += `<div class="campus-section"><h2>${campus}</h2>`;
         missedSummary[campus].forEach(entry => {
           summaryDiv.innerHTML += `<div class="week-section"><h3>${entry.week}</h3>`;
           if (entry.error) {
             summaryDiv.innerHTML += `<p class="error">${entry.error}</p>`;
-          } else if (entry.missed.length === 0) {
-            summaryDiv.innerHTML += `<p class="none">All rooms were completed or reset.</p>`;
           } else {
-            summaryDiv.innerHTML += `<ul>${entry.missed.map(r => `<li>${r}</li>`).join('')}</ul>`;
+            const missed = entry.missed;
+            if (Object.keys(missed).length === 0) {
+              summaryDiv.innerHTML += `<p class="none">All rooms were completed or reset.</p>`;
+            } else {
+              for (const hk in missed) {
+                summaryDiv.innerHTML += `<div class="housekeeper-section"><strong>${hk}</strong><ul>`;
+                missed[hk].forEach(room => {
+                  summaryDiv.innerHTML += `<li>${room}</li>`;
+                });
+                summaryDiv.innerHTML += `</ul></div>`;
+              }
+            }
           }
           summaryDiv.innerHTML += `</div>`;
         });
