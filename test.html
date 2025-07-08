@@ -48,6 +48,7 @@
     const weekdayOrder = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
 
     function parseCsv(text) {
+      if (!text) return [];
       const lines = text.trim().split('\n').filter(line => line.trim() !== '');
       const headers = lines[0].split(/\t|,/).map(h => h.trim());
       return lines.slice(1).map(line => {
@@ -93,7 +94,7 @@
       const oneTimeTaskFile = `schedules/colerain-tasks.csv`;
       scheduleNameDiv.textContent = `Schedule: Colerain-Week${weekNumber}`;
 
-      // Load weekly schedule
+      // Load regular schedule
       let scheduleText = '';
       try {
         const response = await fetch(scheduleFilename);
@@ -104,20 +105,20 @@
         return;
       }
 
-      // Load one-time task file
+      // Load one-time tasks
       let oneTimeText = '';
       try {
         const response = await fetch(oneTimeTaskFile);
         if (!response.ok) throw new Error(`File not found: ${oneTimeTaskFile}`);
         oneTimeText = await response.text();
       } catch (err) {
-        console.warn('Could not load one-time tasks:', err.message);
+        console.warn('Could not load one-time tasks file:', err.message);
       }
 
       const scheduleData = parseCsv(scheduleText);
       const oneTimeTasks = parseCsv(oneTimeText);
 
-      // JotForm config
+      // JotForm settings
       const apiKey = '5b9a10e2092947d49dac84004ad149a2';
       const formId = '250955404825056';
       const roomFieldId = '18';
@@ -128,7 +129,6 @@
 
       const resetTimes = {};
       const validSubmissions = {};
-
       for (const sub of submissionsData) {
         const createdAt = new Date(sub.created_at);
         const roomRaw = sub.answers?.[roomFieldId]?.answer?.trim() || '';
@@ -165,7 +165,7 @@
 
       const getName = initial => housekeeperNames[initial] || initial;
 
-      // Weekly schedule grouping
+      // Weekly schedule grouped
       const grouped = {};
       for (const item of scheduleData) {
         const day = item.Day;
@@ -187,19 +187,20 @@
         oneTimeGrouped[hkName].push(task);
       }
 
-      // Render HTML
+      // Combine everything into one display
       let totalRooms = 0, completedRooms = 0;
       let html = '';
 
       Object.entries(grouped).forEach(([hkName, days]) => {
         html += `<h2>${hkName}</h2>`;
+
+        // Weekly rooms
         weekdayOrder.forEach(day => {
           if (days[day]?.length) {
             html += `<h3>${day}</h3><ul>`;
             days[day].forEach(room => {
               totalRooms++;
-              let extra = '';
-              let cls = '';
+              let cls = '', extra = '';
 
               if (statusMap[room]) {
                 completedRooms++;
@@ -217,31 +218,30 @@
             html += '</ul>';
           }
         });
-      });
 
-      // One-time task section
-      html += `<hr><h1>One-Time Tasks</h1>`;
-      for (const [hkName, tasks] of Object.entries(oneTimeGrouped)) {
-        html += `<h2>${hkName}</h2><ul>`;
-        for (const task of tasks) {
-          const room = task['Room Name'];
-          const link = task['FormLink'] || `https://form.jotform.com/${formId}?room=${encodeURIComponent(room)}`;
-          let cls = '';
-          let extra = '';
-          totalRooms++;
+        // One-time tasks under same housekeeper
+        const tasks = oneTimeGrouped[hkName] || [];
+        if (tasks.length > 0) {
+          html += `<h3>One-Time Tasks</h3><ul>`;
+          tasks.forEach(task => {
+            const room = task['Room Name'];
+            const link = task['FormLink'] || `https://form.jotform.com/${formId}?room=${encodeURIComponent(room)}`;
+            let cls = '', extra = '';
+            totalRooms++;
 
-          if (statusMap[room]) {
-            completedRooms++;
-            cls = 'completed';
-            extra = ` - ${statusMap[room].date.toLocaleString()}`;
-          } else {
-            cls = 'pending';
-          }
+            if (statusMap[room]) {
+              completedRooms++;
+              cls = 'completed';
+              extra = ` - ${statusMap[room].date.toLocaleString()}`;
+            } else {
+              cls = 'pending';
+            }
 
-          html += `<li class="${cls}"><a href="${link}" target="_blank">${room}</a>${extra}</li>`;
+            html += `<li class="${cls}"><a href="${link}" target="_blank">${room}</a>${extra}</li>`;
+          });
+          html += '</ul>';
         }
-        html += '</ul>';
-      }
+      });
 
       if (completedRooms === totalRooms) {
         assignmentsDiv.innerHTML = `<p class="no-pending">All rooms are completed this week!</p>`;
@@ -259,7 +259,7 @@
       console.error(err);
     });
 
-    setInterval(() => location.reload(), 300000); // Refresh every 5 minutes
+    setInterval(() => location.reload(), 300000); // Auto-refresh every 5 minutes
   </script>
 </body>
 </html>
