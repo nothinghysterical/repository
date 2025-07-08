@@ -50,9 +50,13 @@
     function parseCsv(text) {
       if (!text) return [];
       const lines = text.trim().split('\n').filter(line => line.trim() !== '');
-      const headers = lines[0].split(',').map(h => h.trim().replace(/^"|"$/g, ''));
+
+      // Detect delimiter: tab or comma
+      const delimiter = lines[0].includes('\t') ? '\t' : ',';
+
+      const headers = lines[0].split(delimiter).map(h => h.trim().replace(/^"|"$/g, ''));
       return lines.slice(1).map(line => {
-        const values = line.split(',').map(v => v.trim().replace(/^"|"$/g, ''));
+        const values = line.split(delimiter).map(v => v.trim().replace(/^"|"$/g, ''));
         const obj = {};
         headers.forEach((h, i) => obj[h] = values[i] || '');
         return obj;
@@ -165,13 +169,8 @@
 
       const getName = initial => housekeeperNames[initial] || initial;
 
-      // Initialize grouped with all housekeepers so their section shows even if no weekly rooms assigned
+      // Weekly schedule grouped by housekeeper and day
       const grouped = {};
-      Object.values(housekeeperNames).forEach(name => {
-        grouped[name] = {};
-      });
-
-      // Now group weekly rooms
       for (const item of scheduleData) {
         const day = item.Day;
         const hkInitial = item.Housekeeper;
@@ -179,11 +178,12 @@
         if (!day || !hkInitial || !room) continue;
 
         const hkName = getName(hkInitial);
+        if (!grouped[hkName]) grouped[hkName] = {};
         if (!grouped[hkName][day]) grouped[hkName][day] = [];
         grouped[hkName][day].push(room);
       }
 
-      // Group one-time tasks by housekeeper
+      // One-time tasks grouped by housekeeper
       const oneTimeGrouped = {};
       for (const task of oneTimeTasks) {
         const hkName = getName(task.Housekeeper);
@@ -191,14 +191,19 @@
         oneTimeGrouped[hkName].push(task);
       }
 
-      // Build display HTML combining weekly and one-time tasks under each housekeeper
-      let totalRooms = 0, completedRooms = 0;
-      let html = '';
+      // Combine all housekeepers from both sources
+      const allHousekeepers = new Set([
+        ...Object.keys(grouped),
+        ...Object.keys(oneTimeGrouped)
+      ]);
 
-      Object.entries(grouped).forEach(([hkName, days]) => {
+      let html = '';
+      let totalRooms = 0, completedRooms = 0;
+
+      allHousekeepers.forEach(hkName => {
         html += `<h2>${hkName}</h2>`;
 
-        // Weekly rooms
+        const days = grouped[hkName] || {};
         weekdayOrder.forEach(day => {
           if (days[day]?.length) {
             html += `<h3>${day}</h3><ul>`;
@@ -223,16 +228,15 @@
           }
         });
 
-        // One-time tasks for this housekeeper
+        // One-time tasks under same housekeeper
         const tasks = oneTimeGrouped[hkName] || [];
         if (tasks.length > 0) {
           html += `<h3>One-Time Tasks</h3><ul>`;
           tasks.forEach(task => {
             const room = task['Room Name'];
-            // Use FormLink from CSV or fallback to default with prefilled space param
             const link = task['FormLink'] || `https://form.jotform.com/${formId}?space=${encodeURIComponent(room)}`;
-            let cls = '', extra = '';
             totalRooms++;
+            let cls = '', extra = '';
 
             if (statusMap[room]) {
               completedRooms++;
@@ -242,17 +246,17 @@
               cls = 'pending';
             }
 
-            html += `<li class="${cls}"><a href="${link}" target="_blank" rel="noopener noreferrer">${room}</a>${extra}</li>`;
+            html += `<li class="${cls}"><a href="${link}" target="_blank">${room}</a>${extra}</li>`;
           });
           html += '</ul>';
         }
       });
 
-      if (completedRooms === totalRooms) {
-        assignmentsDiv.innerHTML = `<p class="no-pending">All rooms are completed this week!</p>`;
+      if (completedRooms === totalRooms && totalRooms > 0) {
+        assignmentsDiv.innerHTML = `<p class="no-pending">All rooms and tasks are completed this week!</p>`;
+      } else {
+        assignmentsDiv.innerHTML = html;
       }
-
-      assignmentsDiv.innerHTML += html;
 
       const percent = totalRooms > 0 ? Math.round((completedRooms / totalRooms) * 100) : 100;
       progressBar.style.width = percent + '%';
