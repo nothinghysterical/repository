@@ -200,22 +200,35 @@
         weekdayOrder.forEach(day => {
           if (days[day]?.length) {
             html += `<h3>${day}</h3><ul>`;
-            days[day].forEach(room => {
+            days[day].forEach(roomName => {
+              // Find matching schedule item to get optional Link
+              const scheduleItem = scheduleData.find(item =>
+                item['Room Name'] === roomName &&
+                item.Day === day &&
+                getName(item.Housekeeper) === hkName
+              );
+
+              const link = scheduleItem?.Link?.trim() || '';
+
               totalRooms++;
               let cls = '', extra = '';
 
-              if (statusMap[room]) {
+              if (statusMap[roomName]) {
                 completedRooms++;
                 cls = 'completed';
-                extra = ` - ${statusMap[room].date.toLocaleString()}`;
-              } else if (resetRooms.has(room)) {
+                extra = ` - ${statusMap[roomName].date.toLocaleString()}`;
+              } else if (resetRooms.has(roomName)) {
                 cls = 'returned';
                 extra = ' - Returned to Schedule';
               } else {
                 cls = 'pending';
               }
 
-              html += `<li class="${cls}">${room}${extra}</li>`;
+              const displayRoom = link
+                ? `<a href="${link}" target="_blank" rel="noopener noreferrer">${roomName}</a>`
+                : roomName;
+
+              html += `<li class="${cls}">${displayRoom}${extra}</li>`;
             });
             html += '</ul>';
           }
@@ -254,7 +267,7 @@
                   cls = 'pending';
                 }
 
-                html += `<li class="${cls}"><a href="${link}" target="_blank">${room}</a>${extra}</li>`;
+                html += `<li class="${cls}"><a href="${link}" target="_blank" rel="noopener noreferrer">${room}</a>${extra}</li>`;
               });
               html += `</ul>`;
             }
