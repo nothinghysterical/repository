@@ -12,6 +12,19 @@
     h4 { margin-left: 2rem; margin-bottom: 0.25rem; color: #444; }
     ul { margin-left: 2rem; margin-bottom: 1rem; list-style-type: none; padding-left: 1rem; }
     li { margin-bottom: 0.25rem; }
+    .instructions {
+      background-color: #f0f8ff;
+      border: 1px solid #99c;
+      border-radius: 5px;
+      padding: 1rem 1.5rem;
+      margin-bottom: 2rem;
+      color: #222;
+      line-height: 1.4;
+      max-width: 700px;
+      margin-left: auto;
+      margin-right: auto;
+      font-size: 1rem;
+    }
     .completed { color: green; }
     .completed::before {
       content: "✓ ";
@@ -31,14 +44,22 @@
     }
     .pending { font-weight: bold; }
     .no-pending { text-align: center; color: #666; margin-top: 2rem; font-style: italic; }
-    .progress-bar { width: 100%; background-color: #e0e0e0; border-radius: 10px; overflow: hidden; margin-bottom: 1rem; }
+    .progress-bar { width: 100%; background-color: #e0e0e0; border-radius: 10px; overflow: hidden; margin-bottom: 1rem; max-width: 700px; margin-left: auto; margin-right: auto; }
     .progress-fill { height: 20px; background-color: #4caf50; width: 0%; transition: width 0.5s; text-align: center; color: white; line-height: 20px; }
-    .refresh-button { display: inline-block; margin: 0 auto 1rem; padding: 0.5rem 1rem; background-color: #007bff; color: white; border: none; border-radius: 5px; cursor: pointer; }
-    .schedule-name { text-align: center; margin-top: 2rem; color: #666; }
+    .refresh-button { display: block; margin: 0 auto 1rem; padding: 0.5rem 1rem; background-color: #007bff; color: white; border: none; border-radius: 5px; cursor: pointer; }
+    .schedule-name { text-align: center; margin-top: 2rem; color: #666; max-width: 700px; margin-left: auto; margin-right: auto; }
   </style>
 </head>
 <body>
   <h1>Pending Room Assignments</h1>
+
+  <div class="instructions">
+    <strong>Instructions:</strong><br />
+    This schedule outlines your tasks for the week. Please complete all assigned items or notify your supervisor if any cannot be finished within the week.<br /><br />
+    To mark tasks as completed, scan the NFC tags in the building and submit the online form.<br /><br />
+    For tasks with a provided link, you may use the link to mark the task as complete (some tasks may not have an NFC tag).
+  </div>
+
   <button class="refresh-button" onclick="location.reload()">Refresh</button>
   <div class="progress-bar"><div id="progress" class="progress-fill">0%</div></div>
   <div id="assignments"></div>
