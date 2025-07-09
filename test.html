@@ -8,88 +8,133 @@
     body {
       font-family: sans-serif;
       margin: 20px;
-      font-size: 1rem;
+      font-size: 1.2rem;
+      line-height: 1.5;
+      color: #222;
     }
 
     h1 {
-      text-align: center;
-      margin-bottom: 1rem;
-      font-size: 1.75rem;
+      margin-bottom: 1.5rem;
+      font-size: 2rem;
+      text-align: left;
     }
 
     .instructions-toggle,
     .refresh-button {
-      display: block;
       background-color: #007bff;
       color: white;
-      padding: 1rem;
-      font-size: 1.1rem;
+      padding: 1.25rem 1.5rem;
+      font-size: 1.25rem;
       width: 100%;
-      max-width: 320px;
+      max-width: 400px;
       border: none;
-      border-radius: 5px;
-      margin: 0.75rem auto;
+      border-radius: 6px;
+      margin: 1rem 0;
       cursor: pointer;
+      text-align: left;
+    }
+
+    .instructions-toggle:hover,
+    .refresh-button:hover {
+      background-color: #0056b3;
     }
 
     .instructions {
       display: none;
       background-color: #f0f8ff;
-      border: 1px solid #99c;
-      border-radius: 5px;
-      padding: 1rem;
-      margin-bottom: 1.5rem;
-      color: #222;
-      line-height: 1.5;
+      border: 1.5px solid #99c;
+      border-radius: 6px;
+      padding: 1.25rem 1.5rem;
+      margin-bottom: 2rem;
       max-width: 700px;
-      margin-left: auto;
-      margin-right: auto;
-      font-size: 1rem;
+      font-size: 1.1rem;
+      color: #222;
+      line-height: 1.6;
+      text-align: left;
     }
 
     .filter-container {
       max-width: 700px;
-      margin: 1rem auto;
-      text-align: center;
+      margin-bottom: 2rem;
+      text-align: left;
+      width: 100%;
+      max-width: 400px;
+    }
+
+    .filter-container label {
+      font-weight: bold;
+      font-size: 1.15rem;
+      display: block;
+      margin-bottom: 0.5rem;
     }
 
     .filter-container select {
-      padding: 0.6rem;
-      font-size: 1.1rem;
+      padding: 0.8rem 1rem;
+      font-size: 1.2rem;
       width: 100%;
-      max-width: 260px;
-      border-radius: 4px;
-      border: 1px solid #ccc;
+      border-radius: 6px;
+      border: 1.5px solid #ccc;
+      box-sizing: border-box;
     }
 
     .progress-bar {
       width: 100%;
       max-width: 500px;
-      margin: 1rem auto;
+      height: 36px;
       background-color: #e0e0e0;
-      border-radius: 10px;
+      border-radius: 12px;
       overflow: hidden;
-      height: 28px;
+      margin-bottom: 2rem;
     }
 
     .progress-fill {
       height: 100%;
       background-color: #4caf50;
       width: 0%;
-      transition: width 0.5s;
+      transition: width 0.5s ease-in-out;
       text-align: center;
       color: white;
-      line-height: 28px;
-      font-size: 0.95rem;
+      font-size: 1.15rem;
+      line-height: 36px;
+      font-weight: 600;
+      user-select: none;
     }
 
     .schedule-name {
-      text-align: center;
-      margin-top: 2rem;
-      color: #666;
       max-width: 700px;
-      margin-left: auto;
-      margin-right: auto;
+      margin-bottom: 2rem;
+      color: #666;
+      font-size: 1.1rem;
+      text-align: left;
+    }
+
+    /* List and heading styles */
+    h2 {
+      margin-top: 2rem;
+      margin-bottom: 0.5rem;
+      font-size: 1.5rem;
+      color: #222;
+      text-align: left;
+    }
+
+    h3 {
+      margin-left: 1rem;
+      margin-bottom: 0.25rem;
+      color: #333;
+      font-size: 1.25rem;
+      text-align: left;
+    }
+
+    ul {
+      margin-left: 2rem;
+      margin-bottom: 1.5rem;
+      list-style-type: none;
+      padding-left: 1rem;
+    }
+
+    li {
+      margin-bottom: 0.4rem;
+      font-size: 1.1rem;
     }
 
     .completed {
@@ -100,7 +145,7 @@
       content: "✓ ";
       color: green;
       font-weight: bold;
-      margin-right: 0.25rem;
+      margin-right: 0.3rem;
     }
 
     .returned {
@@ -112,7 +157,7 @@
       content: "↺ ";
       color: orange;
       font-weight: bold;
-      margin-right: 0.25rem;
+      margin-right: 0.3rem;
     }
 
     .pending {
@@ -120,35 +165,41 @@
     }
 
     .no-pending {
-      text-align: center;
+      text-align: left;
       color: #666;
       margin-top: 2rem;
       font-style: italic;
+      font-size: 1.1rem;
     }
 
     @media (max-width: 600px) {
       body {
-        font-size: 1.1rem;
+        font-size: 1.3rem;
       }
 
       h1 {
-        font-size: 1.5rem;
+        font-size: 1.8rem;
       }
 
-      .instructions {
-        font-size: 1.05rem;
+      .instructions-toggle,
+      .refresh-button {
+        font-size: 1.3rem;
+        padding: 1.3rem 1.5rem;
+        max-width: 100%;
       }
 
       .filter-container select {
-        font-size: 1.1rem;
+        font-size: 1.25rem;
       }
 
       .progress-bar {
-        height: 30px;
+        height: 40px;
+        max-width: 100%;
       }
 
       .progress-fill {
-        font-size: 1rem;
+        font-size: 1.25rem;
+        line-height: 40px;
       }
     }
   </style>
@@ -165,7 +216,7 @@
   </div>
 
   <div class="filter-container">
-    <label for="filterSelect"><strong>Filter by Housekeeper:</strong></label><br />
+    <label for="filterSelect">Filter by Housekeeper:</label>
     <select id="filterSelect">
       <option value="">All</option>
       <option value="Brian">Brian</option>
