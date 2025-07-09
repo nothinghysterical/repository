@@ -5,23 +5,30 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Pending Room Assignments</title>
   <style>
-    body { font-family: sans-serif; margin: 20px; }
-    h1 { text-align: center; margin-bottom: 1rem; }
-    h2 { margin-top: 2rem; margin-bottom: 0.5rem; }
-    h3 { margin-left: 1rem; margin-bottom: 0.25rem; color: #333; }
-    h4 { margin-left: 2rem; margin-bottom: 0.25rem; color: #444; }
-    ul { margin-left: 2rem; margin-bottom: 1rem; list-style-type: none; padding-left: 1rem; }
-    li { margin-bottom: 0.25rem; }
+    body {
+      font-family: sans-serif;
+      margin: 20px;
+      font-size: 1rem;
+    }
 
-    .instructions-toggle {
+    h1 {
+      text-align: center;
+      margin-bottom: 1rem;
+      font-size: 1.75rem;
+    }
+
+    .instructions-toggle,
+    .refresh-button {
       display: block;
       background-color: #007bff;
       color: white;
-      padding: 0.5rem 1rem;
-      text-align: center;
+      padding: 1rem;
+      font-size: 1.1rem;
+      width: 100%;
+      max-width: 320px;
       border: none;
       border-radius: 5px;
-      margin: 0 auto 1rem;
+      margin: 0.75rem auto;
       cursor: pointer;
     }
 
@@ -30,10 +37,10 @@
       background-color: #f0f8ff;
       border: 1px solid #99c;
       border-radius: 5px;
-      padding: 1rem 1.5rem;
-      margin-bottom: 1rem;
+      padding: 1rem;
+      margin-bottom: 1.5rem;
       color: #222;
-      line-height: 1.4;
+      line-height: 1.5;
       max-width: 700px;
       margin-left: auto;
       margin-right: auto;
@@ -42,41 +49,108 @@
 
     .filter-container {
       max-width: 700px;
-      margin: 0 auto 1.5rem auto;
+      margin: 1rem auto;
       text-align: center;
     }
 
     .filter-container select {
-      padding: 0.3rem 0.5rem;
-      font-size: 1rem;
-      width: 200px;
-      border: 1px solid #ccc;
+      padding: 0.6rem;
+      font-size: 1.1rem;
+      width: 100%;
+      max-width: 260px;
       border-radius: 4px;
+      border: 1px solid #ccc;
     }
 
-    .completed { color: green; }
+    .progress-bar {
+      width: 100%;
+      max-width: 500px;
+      margin: 1rem auto;
+      background-color: #e0e0e0;
+      border-radius: 10px;
+      overflow: hidden;
+      height: 28px;
+    }
+
+    .progress-fill {
+      height: 100%;
+      background-color: #4caf50;
+      width: 0%;
+      transition: width 0.5s;
+      text-align: center;
+      color: white;
+      line-height: 28px;
+      font-size: 0.95rem;
+    }
+
+    .schedule-name {
+      text-align: center;
+      margin-top: 2rem;
+      color: #666;
+      max-width: 700px;
+      margin-left: auto;
+      margin-right: auto;
+    }
+
+    .completed {
+      color: green;
+    }
+
     .completed::before {
       content: "✓ ";
       color: green;
       font-weight: bold;
       margin-right: 0.25rem;
     }
+
     .returned {
       color: orange;
       font-weight: bold;
     }
+
     .returned::before {
       content: "↺ ";
       color: orange;
       font-weight: bold;
       margin-right: 0.25rem;
     }
-    .pending { font-weight: bold; }
-    .no-pending { text-align: center; color: #666; margin-top: 2rem; font-style: italic; }
-    .progress-bar { width: 100%; background-color: #e0e0e0; border-radius: 10px; overflow: hidden; margin-bottom: 1rem; max-width: 700px; margin-left: auto; margin-right: auto; }
-    .progress-fill { height: 20px; background-color: #4caf50; width: 0%; transition: width 0.5s; text-align: center; color: white; line-height: 20px; }
-    .refresh-button { display: block; margin: 0 auto 1rem; padding: 0.5rem 1rem; background-color: #007bff; color: white; border: none; border-radius: 5px; cursor: pointer; }
-    .schedule-name { text-align: center; margin-top: 2rem; color: #666; max-width: 700px; margin-left: auto; margin-right: auto; }
+
+    .pending {
+      font-weight: bold;
+    }
+
+    .no-pending {
+      text-align: center;
+      color: #666;
+      margin-top: 2rem;
+      font-style: italic;
+    }
+
+    @media (max-width: 600px) {
+      body {
+        font-size: 1.1rem;
+      }
+
+      h1 {
+        font-size: 1.5rem;
+      }
+
+      .instructions {
+        font-size: 1.05rem;
+      }
+
+      .filter-container select {
+        font-size: 1.1rem;
+      }
+
+      .progress-bar {
+        height: 30px;
+      }
+
+      .progress-fill {
+        font-size: 1rem;
+      }
+    }
   </style>
 </head>
 <body>
@@ -91,7 +165,7 @@
   </div>
 
   <div class="filter-container">
-    <label for="filterSelect"><strong>Filter by Housekeeper:</strong></label>
+    <label for="filterSelect"><strong>Filter by Housekeeper:</strong></label><br />
     <select id="filterSelect">
       <option value="">All</option>
       <option value="Brian">Brian</option>
@@ -102,7 +176,11 @@
   </div>
 
   <button class="refresh-button" onclick="location.reload()">Refresh</button>
-  <div class="progress-bar"><div id="progress" class="progress-fill">0%</div></div>
+
+  <div class="progress-bar">
+    <div id="progress" class="progress-fill">0%</div>
+  </div>
+
   <div id="assignments"></div>
   <div class="schedule-name" id="scheduleName"></div>
 
@@ -141,7 +219,6 @@
       applyFilter(e.target.value);
     });
 
-    // Set dropdown from ?filter=
     window.addEventListener('DOMContentLoaded', () => {
       const initialFilter = getQueryParam('filter') || '';
       const select = document.getElementById('filterSelect');
@@ -152,7 +229,6 @@
     });
   </script>
 
-  <!-- Your existing dynamic script here -->
-  <script src="assignments-loader.js"></script> <!-- If you're loading data dynamically -->
+  <script src="assignments-loader.js"></script>
 </body>
 </html>
