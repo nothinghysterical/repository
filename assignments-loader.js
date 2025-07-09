@@ -47,9 +47,9 @@ async function load() {
   const sunday = new Date(monday);
   sunday.setDate(monday.getDate() + 6);
   const weekNumber = getWeekOfMonth(monday);
-  const scheduleFilename = `schedules/Colerain-Week${weekNumber}.csv`;
-  const oneTimeTaskFile = `schedules/colerain-tasks.csv`;
-  scheduleNameDiv.textContent = `Schedule: Colerain-Week${weekNumber}`;
+  const scheduleFilename = `schedules/Ross-Week${weekNumber}.csv`;
+  const oneTimeTaskFile = `schedules/ross-tasks.csv`;
+  scheduleNameDiv.textContent = `Schedule: Ross-Week${weekNumber}`;
 
   let scheduleText = '', oneTimeText = '';
   try {
@@ -110,7 +110,7 @@ async function load() {
     const day = item.Day;
     const hkInitial = item.Housekeeper;
     const room = item['Room Name'];
-    const link = item.FormLink;
+    const link = item.FormLink?.trim() || '';
     if (!day || !hkInitial || !room) continue;
 
     const hkName = getName(hkInitial);
@@ -168,7 +168,7 @@ async function load() {
       html += `<h3>Additional Tasks</h3><h4>Please complete this week, click the link to complete</h4><ul>`;
       tasks.forEach(task => {
         const room = task['Room Name'];
-        const link = task['FormLink'] || `https://form.jotform.com/${formId}?space=${encodeURIComponent(room)}`;
+        const link = task['FormLink']?.trim() || `https://form.jotform.com/${formId}?space=${encodeURIComponent(room)}`;
         total++;
         let cls = '', extra = '';
         if (statusMap[room]) {
