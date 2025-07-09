@@ -17,13 +17,29 @@
       border: 1px solid #99c;
       border-radius: 5px;
       padding: 1rem 1.5rem;
-      margin-bottom: 2rem;
+      margin-bottom: 1rem;
       color: #222;
       line-height: 1.4;
       max-width: 700px;
       margin-left: auto;
       margin-right: auto;
       font-size: 1rem;
+    }
+    .filter-container {
+      max-width: 700px;
+      margin: 0 auto 1.5rem auto;
+      text-align: center;
+    }
+    .filter-container label {
+      font-weight: bold;
+      margin-right: 0.5rem;
+    }
+    .filter-container input[type="text"] {
+      padding: 0.3rem 0.5rem;
+      font-size: 1rem;
+      width: 200px;
+      border: 1px solid #ccc;
+      border-radius: 4px;
     }
     .completed { color: green; }
     .completed::before {
@@ -58,6 +74,11 @@
     This schedule outlines your tasks for the week. Please complete all assigned items or notify your supervisor if any cannot be finished within the week.<br /><br />
     To mark tasks as completed, scan the NFC tags in the building and submit the online form.<br /><br />
     For tasks with a provided link, you may use the link to mark the task as complete (some tasks may not have an NFC tag).
+  </div>
+
+  <div class="filter-container">
+    <label for="filterInput">Filter by Housekeeper:</label>
+    <input type="text" id="filterInput" placeholder="Enter name..." />
   </div>
 
   <button class="refresh-button" onclick="location.reload()">Refresh</button>
@@ -102,6 +123,12 @@
         current.setDate(current.getDate() + 1);
       }
       return mondayCount;
+    }
+
+    // Utility: get query param by name
+    function getQueryParam(param) {
+      const urlParams = new URLSearchParams(window.location.search);
+      return urlParams.get(param);
     }
 
     async function load() {
@@ -215,20 +242,18 @@
       let totalRooms = 0, completedRooms = 0;
 
       allHousekeepers.forEach(hkName => {
-        html += `<h2>${hkName}</h2>`;
+        html += `<div class="housekeeper-section"><h2>${hkName}</h2>`;
 
         const days = grouped[hkName] || {};
         weekdayOrder.forEach(day => {
           if (days[day]?.length) {
             html += `<h3>${day}</h3><ul>`;
             days[day].forEach(roomName => {
-              // Find matching schedule item to get optional Link
               const scheduleItem = scheduleData.find(item =>
                 item['Room Name'] === roomName &&
                 item.Day === day &&
                 getName(item.Housekeeper) === hkName
               );
-
               const link = scheduleItem?.Link?.trim() || '';
 
               totalRooms++;
@@ -271,7 +296,6 @@
                 const link = task['FormLink'] || `https://form.jotform.com/${formId}?space=${encodeURIComponent(room)}`;
                 const status = statusMap[room];
 
-                // Only show if not completed or completed this week
                 if (status) {
                   const completedDate = new Date(status.date);
                   if (completedDate < monday || completedDate > sunday) return;
@@ -294,6 +318,8 @@
             }
           });
         }
+
+        html += `</div>`; // close housekeeper-section
       });
 
       if (completedRooms === totalRooms && totalRooms > 0) {
@@ -305,6 +331,30 @@
       const percent = totalRooms > 0 ? Math.round((completedRooms / totalRooms) * 100) : 100;
       progressBar.style.width = percent + '%';
       progressBar.textContent = percent + '%';
+
+      // Apply initial filter from URL param if exists
+      const initialFilter = getQueryParam('filter') || '';
+      const filterInput = document.getElementById('filterInput');
+      filterInput.value = initialFilter;
+      applyFilter(initialFilter);
+
+      // Listen for filter input changes
+      filterInput.addEventListener('input', e => {
+        applyFilter(e.target.value);
+      });
+    }
+
+    function applyFilter(filterText) {
+      const filter = filterText.trim().toLowerCase();
+      const sections = document.querySelectorAll('.housekeeper-section');
+      sections.forEach(section => {
+        const name = section.querySelector('h2')?.textContent.toLowerCase() || '';
+        if (!filter || name.includes(filter)) {
+          section.style.display = '';
+        } else {
+          section.style.display = 'none';
+        }
+      });
     }
 
     window.onload = () => {
