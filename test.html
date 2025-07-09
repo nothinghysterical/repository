@@ -12,7 +12,21 @@
     h4 { margin-left: 2rem; margin-bottom: 0.25rem; color: #444; }
     ul { margin-left: 2rem; margin-bottom: 1rem; list-style-type: none; padding-left: 1rem; }
     li { margin-bottom: 0.25rem; }
+
+    .instructions-toggle {
+      display: block;
+      background-color: #007bff;
+      color: white;
+      padding: 0.5rem 1rem;
+      text-align: center;
+      border: none;
+      border-radius: 5px;
+      margin: 0 auto 1rem;
+      cursor: pointer;
+    }
+
     .instructions {
+      display: none;
       background-color: #f0f8ff;
       border: 1px solid #99c;
       border-radius: 5px;
@@ -25,22 +39,21 @@
       margin-right: auto;
       font-size: 1rem;
     }
+
     .filter-container {
       max-width: 700px;
       margin: 0 auto 1.5rem auto;
       text-align: center;
     }
-    .filter-container label {
-      font-weight: bold;
-      margin-right: 0.5rem;
-    }
-    .filter-container input[type="text"] {
+
+    .filter-container select {
       padding: 0.3rem 0.5rem;
       font-size: 1rem;
       width: 200px;
       border: 1px solid #ccc;
       border-radius: 4px;
     }
+
     .completed { color: green; }
     .completed::before {
       content: "✓ ";
@@ -69,7 +82,8 @@
 <body>
   <h1>Pending Room Assignments</h1>
 
-  <div class="instructions">
+  <button class="instructions-toggle" onclick="toggleInstructions()">Show Instructions</button>
+  <div class="instructions" id="instructions">
     <strong>Instructions:</strong><br />
     This schedule outlines your tasks for the week. Please complete all assigned items or notify your supervisor if any cannot be finished within the week.<br /><br />
     To mark tasks as completed, scan the NFC tags in the building and submit the online form.<br /><br />
@@ -77,8 +91,14 @@
   </div>
 
   <div class="filter-container">
-    <label for="filterInput">Filter by Housekeeper:</label>
-    <input type="text" id="filterInput" placeholder="Enter name..." />
+    <label for="filterSelect"><strong>Filter by Housekeeper:</strong></label>
+    <select id="filterSelect">
+      <option value="">All</option>
+      <option value="Brian">Brian</option>
+      <option value="Thomas">Thomas</option>
+      <option value="Lisa">Lisa</option>
+      <option value="Garrett">Garrett</option>
+    </select>
   </div>
 
   <button class="refresh-button" onclick="location.reload()">Refresh</button>
@@ -87,261 +107,21 @@
   <div class="schedule-name" id="scheduleName"></div>
 
   <script>
-    const housekeeperNames = { A: 'Brian', B: 'Thomas', C: 'Lisa', D: 'Garrett' };
-    const weekdayOrder = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday', 'Any'];
-
-    function parseCsv(text) {
-      if (!text) return [];
-      const lines = text.trim().split('\n').filter(line => line.trim() !== '');
-      const delimiter = lines[0].includes('\t') ? '\t' : ',';
-      const headers = lines[0].split(delimiter).map(h => h.trim().replace(/^"|"$/g, ''));
-      return lines.slice(1).map(line => {
-        const values = line.split(delimiter).map(v => v.trim().replace(/^"|"$/g, ''));
-        const obj = {};
-        headers.forEach((h, i) => obj[h] = values[i] || '');
-        return obj;
-      });
-    }
-
-    function getMonday(date = new Date()) {
-      const d = new Date(date);
-      const day = d.getDay();
-      const diff = (day === 0 ? -6 : 1) - day;
-      d.setHours(0, 0, 0, 0);
-      d.setDate(d.getDate() + diff);
-      return d;
-    }
-
-    function getWeekOfMonth(mondayDate) {
-      const year = mondayDate.getFullYear();
-      const month = mondayDate.getMonth();
-      const firstOfMonth = new Date(year, month, 1);
-      let mondayCount = 0;
-      let current = new Date(firstOfMonth);
-      while (current <= mondayDate) {
-        if (current.getDay() === 1) mondayCount++;
-        current.setDate(current.getDate() + 1);
+    function toggleInstructions() {
+      const div = document.getElementById('instructions');
+      const button = document.querySelector('.instructions-toggle');
+      if (div.style.display === 'block') {
+        div.style.display = 'none';
+        button.textContent = 'Show Instructions';
+      } else {
+        div.style.display = 'block';
+        button.textContent = 'Hide Instructions';
       }
-      return mondayCount;
     }
 
-    // Utility: get query param by name
     function getQueryParam(param) {
       const urlParams = new URLSearchParams(window.location.search);
       return urlParams.get(param);
-    }
-
-    async function load() {
-      const assignmentsDiv = document.getElementById('assignments');
-      const progressBar = document.getElementById('progress');
-      const scheduleNameDiv = document.getElementById('scheduleName');
-
-      const monday = getMonday();
-      const sunday = new Date(monday);
-      sunday.setDate(monday.getDate() + 6);
-      const weekNumber = getWeekOfMonth(monday);
-      const scheduleFilename = `schedules/Colerain-Week${weekNumber}.csv`;
-      const oneTimeTaskFile = `schedules/colerain-tasks.csv`;
-      scheduleNameDiv.textContent = `Schedule: Colerain-Week${weekNumber}`;
-
-      let scheduleText = '';
-      try {
-        const response = await fetch(scheduleFilename);
-        if (!response.ok) throw new Error(`File not found: ${scheduleFilename}`);
-        scheduleText = await response.text();
-      } catch (err) {
-        assignmentsDiv.innerHTML = `<p style="color:red;">Could not load schedule file: ${err.message}</p>`;
-        return;
-      }
-
-      let oneTimeText = '';
-      try {
-        const response = await fetch(oneTimeTaskFile);
-        if (!response.ok) throw new Error(`File not found: ${oneTimeTaskFile}`);
-        oneTimeText = await response.text();
-      } catch (err) {
-        console.warn('Could not load one-time tasks file:', err.message);
-      }
-
-      const scheduleData = parseCsv(scheduleText);
-      const oneTimeTasks = parseCsv(oneTimeText);
-
-      const apiKey = '5b9a10e2092947d49dac84004ad149a2';
-      const formId = '250955404825056';
-      const roomFieldId = '18';
-
-      const submissionsData = await fetch(`https://api.jotform.com/form/${formId}/submissions?apiKey=${apiKey}&limit=1000`)
-        .then(res => res.json())
-        .then(json => json.content || []);
-
-      const resetTimes = {};
-      const validSubmissions = {};
-      for (const sub of submissionsData) {
-        const createdAt = new Date(sub.created_at);
-        const roomRaw = sub.answers?.[roomFieldId]?.answer?.trim() || '';
-        const roomName = roomRaw.replace(/reset/i, '').trim();
-        if (!roomName) continue;
-        if (createdAt < monday || createdAt > sunday) continue;
-
-        if (/reset/i.test(roomRaw)) {
-          if (!resetTimes[roomName] || createdAt > resetTimes[roomName]) {
-            resetTimes[roomName] = createdAt;
-          }
-        } else {
-          if (!validSubmissions[roomName] || createdAt > validSubmissions[roomName].date) {
-            validSubmissions[roomName] = { date: createdAt, raw: roomRaw };
-          }
-        }
-      }
-
-      const statusMap = {};
-      for (const room in validSubmissions) {
-        const submissionDate = validSubmissions[room].date;
-        if (!resetTimes[room] || submissionDate > resetTimes[room]) {
-          statusMap[room] = { completed: true, date: submissionDate };
-        }
-      }
-
-      const resetRooms = new Set();
-      for (const room in resetTimes) {
-        if (!statusMap[room]) {
-          resetRooms.add(room);
-        }
-      }
-
-      const getName = initial => housekeeperNames[initial] || initial;
-
-      const grouped = {};
-      for (const item of scheduleData) {
-        const day = item.Day;
-        const hkInitial = item.Housekeeper;
-        const room = item['Room Name'];
-        if (!day || !hkInitial || !room) continue;
-
-        const hkName = getName(hkInitial);
-        if (!grouped[hkName]) grouped[hkName] = {};
-        if (!grouped[hkName][day]) grouped[hkName][day] = [];
-        grouped[hkName][day].push(room);
-      }
-
-      const oneTimeGrouped = {};
-      for (const task of oneTimeTasks) {
-        const hkName = getName(task.Housekeeper);
-        const day = task.Day?.trim() || 'Any';
-        if (!oneTimeGrouped[hkName]) oneTimeGrouped[hkName] = {};
-        if (!oneTimeGrouped[hkName][day]) oneTimeGrouped[hkName][day] = [];
-        oneTimeGrouped[hkName][day].push(task);
-      }
-
-      const allHousekeepers = new Set([
-        ...Object.keys(grouped),
-        ...Object.keys(oneTimeGrouped)
-      ]);
-
-      let html = '';
-      let totalRooms = 0, completedRooms = 0;
-
-      allHousekeepers.forEach(hkName => {
-        html += `<div class="housekeeper-section"><h2>${hkName}</h2>`;
-
-        const days = grouped[hkName] || {};
-        weekdayOrder.forEach(day => {
-          if (days[day]?.length) {
-            html += `<h3>${day}</h3><ul>`;
-            days[day].forEach(roomName => {
-              const scheduleItem = scheduleData.find(item =>
-                item['Room Name'] === roomName &&
-                item.Day === day &&
-                getName(item.Housekeeper) === hkName
-              );
-              const link = scheduleItem?.Link?.trim() || '';
-
-              totalRooms++;
-              let cls = '', extra = '';
-
-              if (statusMap[roomName]) {
-                completedRooms++;
-                cls = 'completed';
-                extra = ` - ${statusMap[roomName].date.toLocaleString()}`;
-              } else if (resetRooms.has(roomName)) {
-                cls = 'returned';
-                extra = ' - Returned to Schedule';
-              } else {
-                cls = 'pending';
-              }
-
-              const displayRoom = link
-                ? `<a href="${link}" target="_blank" rel="noopener noreferrer">${roomName}</a>`
-                : roomName;
-
-              html += `<li class="${cls}">${displayRoom}${extra}</li>`;
-            });
-            html += '</ul>';
-          }
-        });
-
-        const tasksByDay = oneTimeGrouped[hkName] || {};
-        const allTasks = Object.values(tasksByDay).flat();
-        if (allTasks.length > 0) {
-          html += `<h3>Additional Tasks<br><span style="font-size: smaller; font-weight: normal; color: #666;">Please complete this week, click the link to complete</span></h3>`;
-          weekdayOrder.forEach(day => {
-            const tasks = tasksByDay[day] || [];
-            if (tasks.length > 0) {
-              if (day !== 'Any') {
-                html += `<h4>${day}</h4>`;
-              }
-              html += `<ul>`;
-              tasks.forEach(task => {
-                const room = task['Room Name'];
-                const link = task['FormLink'] || `https://form.jotform.com/${formId}?space=${encodeURIComponent(room)}`;
-                const status = statusMap[room];
-
-                if (status) {
-                  const completedDate = new Date(status.date);
-                  if (completedDate < monday || completedDate > sunday) return;
-                }
-
-                totalRooms++;
-                let cls = '', extra = '';
-
-                if (status) {
-                  completedRooms++;
-                  cls = 'completed';
-                  extra = ` - ${status.date.toLocaleString()}`;
-                } else {
-                  cls = 'pending';
-                }
-
-                html += `<li class="${cls}"><a href="${link}" target="_blank" rel="noopener noreferrer">${room}</a>${extra}</li>`;
-              });
-              html += `</ul>`;
-            }
-          });
-        }
-
-        html += `</div>`; // close housekeeper-section
-      });
-
-      if (completedRooms === totalRooms && totalRooms > 0) {
-        assignmentsDiv.innerHTML = `<p class="no-pending">All rooms and tasks are completed this week!</p>`;
-      } else {
-        assignmentsDiv.innerHTML = html;
-      }
-
-      const percent = totalRooms > 0 ? Math.round((completedRooms / totalRooms) * 100) : 100;
-      progressBar.style.width = percent + '%';
-      progressBar.textContent = percent + '%';
-
-      // Apply initial filter from URL param if exists
-      const initialFilter = getQueryParam('filter') || '';
-      const filterInput = document.getElementById('filterInput');
-      filterInput.value = initialFilter;
-      applyFilter(initialFilter);
-
-      // Listen for filter input changes
-      filterInput.addEventListener('input', e => {
-        applyFilter(e.target.value);
-      });
     }
 
     function applyFilter(filterText) {
@@ -357,17 +137,22 @@
       });
     }
 
-    window.onload = () => {
-      load().catch(err => {
-        const assignmentsDiv = document.getElementById('assignments');
-        if (assignmentsDiv) {
-          assignmentsDiv.innerHTML = `<p style="color:red;">Error loading assignments: ${err.message}</p>`;
-        }
-        console.error(err);
-      });
-    };
+    document.getElementById('filterSelect').addEventListener('change', (e) => {
+      applyFilter(e.target.value);
+    });
 
-    setInterval(() => location.reload(), 300000); // Auto-refresh every 5 minutes
+    // Set dropdown from ?filter=
+    window.addEventListener('DOMContentLoaded', () => {
+      const initialFilter = getQueryParam('filter') || '';
+      const select = document.getElementById('filterSelect');
+      if (initialFilter) {
+        select.value = initialFilter;
+        applyFilter(initialFilter);
+      }
+    });
   </script>
+
+  <!-- Your existing dynamic script here -->
+  <script src="assignments-loader.js"></script> <!-- If you're loading data dynamically -->
 </body>
 </html>
