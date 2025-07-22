@@ -5,68 +5,140 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Pending Room Assignments</title>
   <style>
-    body { font-family: sans-serif; margin: 20px; }
-    h1 { text-align: center; margin-bottom: 1rem; }
-    h2 { margin-top: 2rem; margin-bottom: 0.5rem; }
-    h3 { margin-left: 1rem; margin-bottom: 0.25rem; color: #333; }
-    ul { margin-left: 2rem; margin-bottom: 1rem; list-style-type: none; padding-left: 1rem; }
-    li { margin-bottom: 0.25rem; }
-
-    .done { color: green; }
-    .done::before {
-      content: "✓ ";
-      color: green;
-      font-weight: bold;
-      margin-right: 0.25rem;
-    }
-
-    .not-done { font-weight: bold; }
-
-    .housekeeper-section {
-      border: 1px solid #ccc;
-      border-radius: 6px;
-      padding: 1rem;
-      margin-bottom: 2rem;
-    }
-
-    .refresh-button {
-      display: block;
-      margin: 0 auto 1rem;
-      padding: 0.5rem 1rem;
-      background-color: #007bff;
-      color: white;
-      border: none;
-      border-radius: 5px;
-      font-size: 1rem;
-      cursor: pointer;
-    }
-
-    @media (max-width: 600px) {
-      body {
-        margin: 10px;
-      }
-
-      h1, h2, h3 {
-        font-size: 1.1rem;
-      }
-
-      .refresh-button {
-        font-size: 1rem;
-        padding: 0.5rem 1rem;
-      }
-
-      ul {
-        margin-left: 1rem;
-        padding-left: 0.5rem;
-      }
-    }
+    body { font-family: sans-serif; margin: 2rem; }
+    h2 { margin-top: 2rem; }
+    .done { text-decoration: line-through; color: green; }
+    .not-done { color: red; }
   </style>
 </head>
 <body>
   <h1>Pending Room Assignments</h1>
-  <button class="refresh-button" onclick="location.reload()">Refresh</button>
   <div id="assignments">Loading...</div>
 
-  <script src="assignments-loader.js"></script>
+  <script>
+    async function load() {
+      const [roomData, jotformData, oneTimeData] = await Promise.all([
+        fetch('schedules/Colerain-Week.csv').then(r => r.text()),
+        fetch('https://api.jotform.com/form/250955404825056/submissions?apikey=5b9a10e2092947d49dac84004ad149a2').then(r => r.json()),
+        fetch('schedules/colerain-tasks.csv').then(r => r.text()),
+      ]);
+
+      const jotformSubmissions = jotformData.content || [];
+
+      const parseCSV = str =>
+        str.trim().split('\n').slice(1).map(line => {
+          const parts = line.split(',');
+          return {
+            room: (parts[0] || '').trim(),
+            day: (parts[1] || '').trim(),
+            person: (parts[2] || '').trim(),
+            link: (parts[3] || '').trim()
+          };
+        });
+
+      const parseOneTimeCSV = str =>
+        str.trim().split('\n').slice(1).map(line => {
+          const parts = line.split(',');
+          return {
+            'Room Name': (parts[0] || '').trim(),
+            'Assigned To': (parts[1] || '').trim(),
+            link: (parts[2] || '').trim()
+          };
+        });
+
+      const tasks = parseCSV(roomData);
+      const oneTimeTasks = parseOneTimeCSV(oneTimeData);
+      const statusMap = {};
+
+      const prevMonday = (() => {
+        const d = new Date();
+        d.setDate(d.getDate() - ((d.getDay() + 6) % 7));
+        d.setHours(0, 0, 0, 0);
+        return d;
+      })();
+
+      jotformSubmissions.forEach(sub => {
+        const room = sub.answers?.['18']?.answer;
+        const dateStr = sub.created_at;
+        if (room && dateStr && new Date(dateStr) >= prevMonday) {
+          statusMap[room.trim()] = true;
+        }
+      });
+
+      const grouped = {};
+      const oneTimeGrouped = {};
+
+      tasks.forEach(({ room, day, person, link }) => {
+        if (!grouped[person]) grouped[person] = {};
+        if (!grouped[person][day]) grouped[person][day] = [];
+        grouped[person][day].push({ room, link });
+      });
+
+      oneTimeTasks.forEach(task => {
+        const person = task['Assigned To'];
+        if (!oneTimeGrouped[person]) oneTimeGrouped[person] = [];
+        oneTimeGrouped[person].push(task);
+      });
+
+      const weekdayOrder = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
+      const allHousekeepers = [...new Set([...Object.keys(grouped), ...Object.keys(oneTimeGrouped)])];
+
+      let html = '';
+      allHousekeepers.forEach(hk => {
+        const days = grouped[hk] || {};
+        const tasks = oneTimeGrouped[hk] || [];
+
+        let hkTotal = 0, hkCompleted = 0;
+        weekdayOrder.forEach(day => {
+          if (days[day]?.length) {
+            days[day].forEach(({ room }) => {
+              hkTotal++;
+              if (statusMap[room]) hkCompleted++;
+            });
+          }
+        });
+
+        tasks.forEach(task => {
+          const room = task['Room Name'];
+          hkTotal++;
+          if (statusMap[room]) hkCompleted++;
+        });
+
+        const hkRemaining = hkTotal - hkCompleted;
+        html += `<div class="housekeeper-section"><h2>${hk} (${hkRemaining} remaining)</h2>`;
+
+        weekdayOrder.forEach(day => {
+          const items = days[day];
+          if (items?.length) {
+            html += `<h3>${day}</h3><ul>`;
+            items.forEach(({ room, link }) => {
+              const done = statusMap[room];
+              const cls = done ? 'done' : 'not-done';
+              const display = link ? `<a href="${link}" target="_blank">${room}</a>` : room;
+              html += `<li class="${cls}">${display}</li>`;
+            });
+            html += '</ul>';
+          }
+        });
+
+        if (tasks.length) {
+          html += `<h3>Additional Rooms</h3><ul>`;
+          tasks.forEach(({ 'Room Name': room, link }) => {
+            const done = statusMap[room];
+            const cls = done ? 'done' : 'not-done';
+            const display = link ? `<a href="${link}" target="_blank">${room}</a>` : room;
+            html += `<li class="${cls}">${display}</li>`;
+          });
+          html += '</ul>';
+        }
+
+        html += '</div>';
+      });
+
+      document.getElementById('assignments').innerHTML = html;
+    }
+
+    load();
+  </script>
 </body>
 </html>
