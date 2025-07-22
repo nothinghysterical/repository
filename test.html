@@ -5,139 +5,221 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Pending Room Assignments</title>
   <style>
-    body { font-family: sans-serif; margin: 2em; }
-    h2 { margin-top: 1em; }
-    ul { margin-bottom: 2em; }
+    body { font-family: sans-serif; margin: 20px; }
+    h1 { text-align: center; margin-bottom: 1rem; }
+    h2 { margin-top: 2rem; margin-bottom: 0.5rem; }
+    h3 { margin-left: 1rem; margin-bottom: 0.25rem; color: #333; }
+    ul { margin-left: 2rem; margin-bottom: 1rem; list-style-type: none; padding-left: 1rem; }
+    li { margin-bottom: 0.25rem; }
+
+    .completed { color: green; }
+    .completed::before {
+      content: "\2713 ";
+      color: green;
+      font-weight: bold;
+      margin-right: 0.25rem;
+    }
+
+    .returned {
+      color: orange;
+      font-weight: bold;
+    }
+    .returned::before {
+      content: "\21BA ";
+      color: orange;
+      font-weight: bold;
+      margin-right: 0.25rem;
+    }
+
+    .pending { font-weight: bold; }
+
+    .no-pending { text-align: center; color: #666; margin-top: 2rem; font-style: italic; }
+    .progress-bar { width: 100%; background-color: #e0e0e0; border-radius: 10px; overflow: hidden; margin-bottom: 1rem; }
+    .progress-fill { height: 20px; background-color: #4caf50; width: 0%; transition: width 0.5s; text-align: center; color: white; line-height: 20px; }
+    .refresh-button { display: inline-block; margin: 0 auto 1rem; padding: 0.5rem 1rem; background-color: #007bff; color: white; border: none; border-radius: 5px; cursor: pointer; }
+    .schedule-name { text-align: center; margin-top: 2rem; color: #666; }
   </style>
 </head>
 <body>
   <h1>Pending Room Assignments</h1>
-  <div id="results"></div>
+  <button class="refresh-button" onclick="location.reload()">Refresh</button>
+  <div class="progress-bar"><div id="progress" class="progress-fill">0%</div></div>
+  <div id="assignments"></div>
+  <div class="schedule-name" id="scheduleName"></div>
 
   <script>
-    const scheduleBasePath = "schedules/Colerain-Week";
-    const tasksBasePath = "schedules/colerain-tasks";
+    const housekeeperNames = { A: 'Brian', B: 'Thomas', C: 'Lisa', D: 'Garrett' };
+    const weekdayOrder = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
 
-    async function loadText(url) {
-      const res = await fetch(url);
-      if (!res.ok) throw new Error(`Failed to load ${url}`);
-      return await res.text();
-    }
-
-    function parseCSV(text) {
-      const lines = text.trim().split("\n");
-      const headers = lines[0].split("\t");
+    function parseCsv(text) {
+      const lines = text.trim().split('\n').filter(line => line.trim() !== '');
+      const headers = lines[0].split(/\t|,/).map(h => h.trim());
       return lines.slice(1).map(line => {
-        const values = line.split("\t");
-        const entry = {};
-        headers.forEach((h, i) => entry[h.trim()] = values[i]?.trim());
-        return entry;
+        const values = line.split(/\t|,/);
+        const obj = {};
+        headers.forEach((h, i) => obj[h] = values[i]?.trim() || '');
+        return obj;
       });
     }
 
-    function getWeekNumberForToday() {
-      const now = new Date();
-      const first = new Date(now.getFullYear(), now.getMonth(), 1);
-      const dayOffset = (first.getDay() + 6) % 7;
-      const firstMonday = new Date(first);
-      firstMonday.setDate(first.getDate() + (dayOffset === 0 ? 0 : 7 - dayOffset));
-      const diffDays = Math.floor((now - firstMonday) / (1000 * 60 * 60 * 24));
-      return Math.floor(diffDays / 7) + 1;
-    }
-
-    function getPreviousMonday(date = new Date()) {
+    function getMonday(date = new Date()) {
       const d = new Date(date);
       const day = d.getDay();
       const diff = (day === 0 ? -6 : 1) - day;
-      d.setDate(d.getDate() + diff);
       d.setHours(0, 0, 0, 0);
+      d.setDate(d.getDate() + diff);
       return d;
     }
 
-    function getNextSunday(date = new Date()) {
-      const monday = getPreviousMonday(date);
+    function getWeekOfMonth(mondayDate) {
+      const year = mondayDate.getFullYear();
+      const month = mondayDate.getMonth();
+      const firstOfMonth = new Date(year, month, 1);
+      let mondayCount = 0;
+      let current = new Date(firstOfMonth);
+      while (current <= mondayDate) {
+        if (current.getDay() === 1) mondayCount++;
+        current.setDate(current.getDate() + 1);
+      }
+      return mondayCount;
+    }
+
+    async function load() {
+      const assignmentsDiv = document.getElementById('assignments');
+      const progressBar = document.getElementById('progress');
+      const scheduleNameDiv = document.getElementById('scheduleName');
+
+      const monday = getMonday();
       const sunday = new Date(monday);
-      sunday.setDate(sunday.getDate() + 6);
-      sunday.setHours(23, 59, 59, 999);
-      return sunday;
-    }
+      sunday.setDate(monday.getDate() + 6);
 
-    async function loadJotformSubmissions() {
-      const apiKey = "5b9a10e2092947d49dac84004ad149a2";
-      const formId = "250955404825056";
-      const res = await fetch(`https://api.jotform.com/form/${formId}/submissions?apiKey=${apiKey}`);
-      const data = await res.json();
-      const submissions = data.content || [];
+      const weekNumber = getWeekOfMonth(monday);
+      const scheduleFilename = `schedules/Colerain-Week${weekNumber}.csv`;
+      scheduleNameDiv.textContent = `Schedule: Colerain-Week${weekNumber}`;
 
-      console.log("Submissions:");
-      console.log(submissions);
+      let scheduleText;
+      try {
+        const scheduleResponse = await fetch(scheduleFilename);
+        if (!scheduleResponse.ok) throw new Error(`File not found: ${scheduleFilename}`);
+        scheduleText = await scheduleResponse.text();
+      } catch (err) {
+        assignmentsDiv.innerHTML = `<p style="color:red;">Could not load schedule file: ${err.message}</p>`;
+        return;
+      }
 
+      const scheduleData = parseCsv(scheduleText);
+      const apiKey = '5b9a10e2092947d49dac84004ad149a2';
+      const formId = '250955404825056';
+      const roomFieldId = '18';
+
+      const submissionsData = await fetch(`https://api.jotform.com/form/${formId}/submissions?apiKey=${apiKey}&limit=1000`)
+        .then(res => res.json())
+        .then(json => json.content || []);
+
+      const resetTimes = {};
       const validSubmissions = {};
-      const prevMonday = getPreviousMonday();
-      const nextSunday = getNextSunday();
 
-      submissions.forEach((sub) => {
-        const roomName = sub.answers["18"]?.answer?.trim();
+      for (const sub of submissionsData) {
         const createdAt = new Date(sub.created_at);
+        const roomRaw = sub.answers?.[roomFieldId]?.answer?.trim() || '';
+        const roomName = roomRaw.replace(/reset/i, '').trim();
+        if (!roomName) continue;
 
-        console.log("Submitted room:", roomName, "on", createdAt.toISOString());
+        if (createdAt < monday || createdAt > sunday) continue;
 
-        if (!roomName || createdAt < prevMonday || createdAt > nextSunday) return;
-
-        if (!validSubmissions[roomName] || createdAt > validSubmissions[roomName].date) {
-          validSubmissions[roomName] = { date: createdAt };
-        }
-      });
-
-      return validSubmissions;
-    }
-
-    async function loadAndDisplayAssignments() {
-      const weekNum = getWeekNumberForToday();
-      const csvText = await loadText(`${scheduleBasePath}${weekNum}.csv`);
-      const assignments = parseCSV(csvText);
-      const submissions = await loadJotformSubmissions();
-
-      const personMap = {};
-
-      assignments.forEach((item) => {
-        const person = item.Housekeeper;
-        const room = item["Room Name"];
-        if (!submissions[room]) {
-          if (!personMap[person]) personMap[person] = [];
-          personMap[person].push(room);
-        }
-      });
-
-      const resultsDiv = document.getElementById("results");
-      resultsDiv.innerHTML = "";
-
-      Object.keys(personMap).sort().forEach(person => {
-        const rooms = personMap[person];
-        const heading = document.createElement("h2");
-        heading.textContent = `${person} — ${rooms.length} remaining`;
-        resultsDiv.appendChild(heading);
-
-        if (rooms.length === 0) {
-          const done = document.createElement("p");
-          done.textContent = "See Brian for additional items.";
-          resultsDiv.appendChild(done);
+        if (/reset/i.test(roomRaw)) {
+          if (!resetTimes[roomName] || createdAt > resetTimes[roomName]) {
+            resetTimes[roomName] = createdAt;
+          }
         } else {
-          const ul = document.createElement("ul");
-          rooms.forEach(room => {
-            const li = document.createElement("li");
-            li.textContent = room;
-            ul.appendChild(li);
-          });
-          resultsDiv.appendChild(ul);
+          if (!validSubmissions[roomName] || createdAt > validSubmissions[roomName].date) {
+            validSubmissions[roomName] = { date: createdAt, raw: roomRaw };
+          }
         }
+      }
+
+      const statusMap = {};
+      for (const room in validSubmissions) {
+        const submissionDate = validSubmissions[room].date;
+        if (!resetTimes[room] || submissionDate > resetTimes[room]) {
+          statusMap[room] = { completed: true, date: submissionDate };
+        }
+      }
+
+      const resetRooms = new Set();
+      for (const room in resetTimes) {
+        if (!statusMap[room]) {
+          resetRooms.add(room);
+        }
+      }
+
+      const grouped = {};
+      function getName(initial) {
+        return housekeeperNames[initial] || initial;
+      }
+
+      for (const item of scheduleData) {
+        const day = item.Day;
+        const hkInitial = item.Housekeeper;
+        const room = item['Room Name'];
+        const link = item['Link'] || '';
+        if (!day || !hkInitial || !room) continue;
+
+        const hkName = getName(hkInitial);
+        if (!grouped[hkName]) grouped[hkName] = {};
+        if (!grouped[hkName][day]) grouped[hkName][day] = [];
+        grouped[hkName][day].push({ room, link });
+      }
+
+      let totalRooms = 0, completedRooms = 0;
+      let html = '';
+
+      Object.entries(grouped).forEach(([hkName, days]) => {
+        html += `<h2>${hkName}</h2>`;
+        weekdayOrder.forEach(day => {
+          if (days[day]?.length) {
+            html += `<h3>${day}</h3><ul>`;
+            days[day].forEach(({ room, link }) => {
+              totalRooms++;
+              let extra = '';
+              let cls = '';
+
+              if (statusMap[room]) {
+                completedRooms++;
+                cls = 'completed';
+                extra = ` - ${statusMap[room].date.toLocaleString()}`;
+              } else if (resetRooms.has(room)) {
+                cls = 'returned';
+                extra = ' - Returned to Schedule';
+              } else {
+                cls = 'pending';
+              }
+
+              const displayText = link ? `<a href="${link}" target="_blank">${room}</a>` : room;
+              html += `<li class="${cls}">${displayText}${extra}</li>`;
+            });
+            html += '</ul>';
+          }
+        });
       });
+
+      if (completedRooms === totalRooms) {
+        assignmentsDiv.innerHTML = `<p class="no-pending">All rooms are completed this week!</p>`;
+      }
+
+      assignmentsDiv.innerHTML += html;
+
+      const percent = totalRooms > 0 ? Math.round((completedRooms / totalRooms) * 100) : 100;
+      progressBar.style.width = percent + '%';
+      progressBar.textContent = percent + '%';
     }
 
-    loadAndDisplayAssignments().catch(err => {
-      console.error("Error:", err);
-      document.getElementById("results").textContent = "Failed to load data.";
+    load().catch(err => {
+      document.getElementById('assignments').innerHTML = `<p style="color:red;">Error loading assignments: ${err.message}</p>`;
+      console.error(err);
     });
+
+    setInterval(() => location.reload(), 300000); // Refresh every 5 minutes
   </script>
 </body>
 </html>
