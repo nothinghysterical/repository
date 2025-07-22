@@ -101,6 +101,15 @@
         const oneTimeData = parseCsv(oneTimeText);
         const submissions = jotformData.content || [];
 
+        console.log("Submissions:");
+console.log(submissions);
+
+submissions.forEach((sub) => {
+  const submittedRoom = sub.answers["18"]?.answer?.trim();
+  console.log("Submitted room:", submittedRoom, "on", sub.date);
+});
+
+
         const prevMonday = currentMonday;
         const nextSunday = new Date(currentMonday);
         nextSunday.setDate(nextSunday.getDate() + 6);
