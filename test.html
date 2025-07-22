@@ -48,11 +48,9 @@
   <div class="schedule-name" id="scheduleName"></div>
 
   <script>
-    // Map initials to friendly housekeeper names - adjust as needed
     const housekeeperNames = { A: 'Brian', B: 'Thomas', C: 'Lisa', D: 'Garrett' };
     const weekdayOrder = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
 
-    // Utility to parse CSV with commas
     function parseCsv(text) {
       const lines = text.trim().split('\n').filter(line => line.trim() !== '');
       const headers = lines[0].split(',').map(h => h.trim());
@@ -64,12 +62,21 @@
       });
     }
 
-    // Get previous Monday at midnight
-    function getPreviousMonday() {
+    function getCurrentMonday() {
       const d = new Date();
+      const offset = (d.getDay() + 6) % 7; // Convert Sunday=0 to Sunday=6
+      d.setDate(d.getDate() - offset);
       d.setHours(0, 0, 0, 0);
-      d.setDate(d.getDate() - ((d.getDay() + 6) % 7));
       return d;
+    }
+
+    function getWeekNumberOfMonth(date) {
+      const firstDayOfMonth = new Date(date.getFullYear(), date.getMonth(), 1);
+      let count = 0;
+      for (let d = new Date(firstDayOfMonth); d <= date; d.setDate(d.getDate() + 1)) {
+        if (d.getDay() === 1) count++; // Monday
+      }
+      return count;
     }
 
     async function load() {
@@ -77,36 +84,34 @@
       const progressBar = document.getElementById('progress');
       const scheduleNameDiv = document.getElementById('scheduleName');
 
-      // Show schedule name (fixed, or could be dynamic)
-      scheduleNameDiv.textContent = 'Schedule: Colerain-Week (from colerain csv files)';
+      const currentMonday = getCurrentMonday();
+      const weekNumber = getWeekNumberOfMonth(currentMonday); // 1-based index
+
+      const scheduleFilename = `schedules/Colerain-Week${weekNumber}.csv`;
+      scheduleNameDiv.textContent = `Schedule: Colerain-Week${weekNumber}`;
 
       try {
-        // Fetch schedule tasks and one-time tasks
         const [scheduleText, oneTimeText, jotformData] = await Promise.all([
-          fetch('schedules/Colerain-Week.csv').then(r => r.text()),
+          fetch(scheduleFilename).then(r => r.text()),
           fetch('schedules/colerain-tasks.csv').then(r => r.text()),
           fetch('https://api.jotform.com/form/250955404825056/submissions?apikey=5b9a10e2092947d49dac84004ad149a2').then(r => r.json()),
         ]);
 
-        // Parse CSVs
         const scheduleData = parseCsv(scheduleText);
         const oneTimeData = parseCsv(oneTimeText);
-
-        // Extract JotForm submissions content array
         const submissions = jotformData.content || [];
 
-        const prevMonday = getPreviousMonday();
+        const prevMonday = currentMonday;
+        const nextSunday = new Date(currentMonday);
+        nextSunday.setDate(nextSunday.getDate() + 6);
 
-        // Track latest completion per room & track resets
         const resetTimes = {};
         const validSubmissions = {};
-
-        // Field id for room in JotForm answers
         const roomFieldId = '18';
 
         submissions.forEach(sub => {
           const createdAt = new Date(sub.created_at);
-          if (createdAt < prevMonday) return; // ignore old
+          if (createdAt < prevMonday || createdAt > nextSunday) return;
 
           let rawRoom = sub.answers?.[roomFieldId]?.answer?.trim() || '';
           if (!rawRoom) return;
@@ -114,19 +119,16 @@
           const roomName = rawRoom.replace(/reset/i, '').trim();
 
           if (/reset/i.test(rawRoom)) {
-            // This is a reset submission
             if (!resetTimes[roomName] || createdAt > resetTimes[roomName]) {
               resetTimes[roomName] = createdAt;
             }
           } else {
-            // Normal completion
             if (!validSubmissions[roomName] || createdAt > validSubmissions[roomName].date) {
-              validSubmissions[roomName] = { date: createdAt, raw: rawRoom };
+              validSubmissions[roomName] = { date: createdAt };
             }
           }
         });
 
-        // Determine final status: completed if last completion is after last reset or no reset
         const statusMap = {};
         for (const room in validSubmissions) {
           if (!resetTimes[room] || validSubmissions[room].date > resetTimes[room]) {
@@ -134,84 +136,70 @@
           }
         }
 
-        // Rooms that have reset but no completion after reset => returned status
         const returnedRooms = new Set();
         for (const room in resetTimes) {
           if (!statusMap[room]) returnedRooms.add(room);
         }
 
-        // Group schedule tasks by housekeeper and day
         const grouped = {};
-        function getName(initial) {
-          return housekeeperNames[initial] || initial;
-        }
         scheduleData.forEach(item => {
           const day = item.Day || item.day;
           const hkInitial = item.Housekeeper || item.housekeeper;
           const room = item['Room Name'] || item.room || item.Room || '';
-
           if (!day || !hkInitial || !room) return;
 
-          const hkName = getName(hkInitial);
+          const hkName = housekeeperNames[hkInitial] || hkInitial;
           if (!grouped[hkName]) grouped[hkName] = {};
           if (!grouped[hkName][day]) grouped[hkName][day] = [];
           grouped[hkName][day].push(room);
         });
 
-        // Group one-time tasks by assigned to
         const oneTimeGrouped = {};
         oneTimeData.forEach(task => {
-          const person = task['Assigned To'] || task['assigned to'] || '';
-          const room = task['Room Name'] || task['room name'] || '';
+          const person = task['Assigned To'] || '';
+          const room = task['Room Name'] || '';
           if (!person || !room) return;
           if (!oneTimeGrouped[person]) oneTimeGrouped[person] = [];
           oneTimeGrouped[person].push(room);
         });
 
-        // Combine all housekeepers from schedule and one-time
         const allHousekeepers = Array.from(new Set([...Object.keys(grouped), ...Object.keys(oneTimeGrouped)]));
-
-        // Build HTML
         let totalRooms = 0, completedRooms = 0;
         let html = '';
 
-        allHousekeepers.forEach(hkName => {
-          html += `<h2>${hkName}</h2>`;
+        allHousekeepers.forEach(hk => {
+          html += `<h2>${hk}</h2>`;
 
-          // Show scheduled rooms by day
           weekdayOrder.forEach(day => {
-            const rooms = grouped[hkName]?.[day] || [];
-            if (rooms.length === 0) return;
+            const rooms = grouped[hk]?.[day] || [];
+            if (!rooms.length) return;
 
             html += `<h3>${day}</h3><ul>`;
             rooms.forEach(room => {
               totalRooms++;
               let cls = 'pending', extra = '';
-
               if (statusMap[room]) {
-                cls = 'completed';
                 completedRooms++;
+                cls = 'completed';
                 extra = ` - ${statusMap[room].date.toLocaleString()}`;
               } else if (returnedRooms.has(room)) {
                 cls = 'returned';
                 extra = ' - Returned to Schedule';
               }
-
               html += `<li class="${cls}">${room}${extra}</li>`;
             });
             html += `</ul>`;
           });
 
-          // Show one-time tasks
-          const oneTimeRooms = oneTimeGrouped[hkName] || [];
-          if (oneTimeRooms.length > 0) {
+          const oneTimes = oneTimeGrouped[hk] || [];
+          if (oneTimes.length) {
             html += `<h3>Additional Rooms</h3><ul>`;
-            oneTimeRooms.forEach(room => {
+            oneTimes.forEach(room => {
               totalRooms++;
               let cls = 'pending', extra = '';
               if (statusMap[room]) {
-                cls = 'completed';
                 completedRooms++;
+                cls = 'completed';
                 extra = ` - ${statusMap[room].date.toLocaleString()}`;
               } else if (returnedRooms.has(room)) {
                 cls = 'returned';
@@ -236,7 +224,6 @@
 
         assignmentsDiv.innerHTML = html;
 
-        // Update progress bar
         const percent = Math.round((completedRooms / totalRooms) * 100);
         progressBar.style.width = percent + '%';
         progressBar.textContent = percent + '%';
@@ -250,8 +237,6 @@
     }
 
     load();
-
-    // Auto refresh every 5 minutes
     setInterval(() => location.reload(), 300000);
   </script>
 </body>
