@@ -8,15 +8,35 @@ async function load() {
   ]);
 
   const jotformSubmissions = jotformData.content || [];
-  const parseCSV = str => str.trim().split('\n').slice(1).map(line => {
-    const [room, day, person, link] = line.split(',');
-    return { room: room.trim(), day: day.trim(), person: person.trim(), link: link?.trim() };
-  });
 
-  const parseOneTimeCSV = str => str.trim().split('\n').slice(1).map(line => {
-    const [room, person, link] = line.split(',');
-    return { 'Room Name': room.trim(), 'Assigned To': person.trim(), link: link?.trim() };
-  });
+  const parseCSV = str =>
+    str
+      .trim()
+      .split('\n')
+      .slice(1)
+      .map(line => {
+        const [room, day, person, link] = line.split(',');
+        return {
+          room: room.trim(),
+          day: day.trim(),
+          person: person.trim(),
+          link: link?.trim(),
+        };
+      });
+
+  const parseOneTimeCSV = str =>
+    str
+      .trim()
+      .split('\n')
+      .slice(1)
+      .map(line => {
+        const [room, person, link] = line.split(',');
+        return {
+          'Room Name': room.trim(),
+          'Assigned To': person.trim(),
+          link: link?.trim(),
+        };
+      });
 
   const tasks = parseCSV(roomData);
   const oneTimeTasks = parseOneTimeCSV(oneTimeData);
@@ -60,7 +80,9 @@ async function load() {
     const days = grouped[hk] || {};
     const tasks = oneTimeGrouped[hk] || [];
 
-    let hkTotal = 0, hkCompleted = 0;
+    let hkTotal = 0,
+      hkCompleted = 0;
+
     weekdayOrder.forEach(day => {
       if (days[day]?.length) {
         days[day].forEach(({ room }) => {
