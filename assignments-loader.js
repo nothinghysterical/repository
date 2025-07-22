@@ -9,20 +9,16 @@ async function load() {
 
   const jotformSubmissions = jotformData.content || [];
 
-  const parseCSV = str =>
-    str
-      .trim()
-      .split('\n')
-      .slice(1)
-      .map(line => {
-        const [room, day, person, link] = line.split(',');
-        return {
-          room: room.trim(),
-          day: day.trim(),
-          person: person.trim(),
-          link: link?.trim(),
-        };
-      });
+const parseCSV = str =>
+  str.trim().split('\n').slice(1).map(line => {
+    const parts = line.split(',');
+    return {
+      room: (parts[0] || '').trim(),
+      day: (parts[1] || '').trim(),
+      person: (parts[2] || '').trim(),
+      link: (parts[3] || '').trim()
+    };
+  });
 
   const parseOneTimeCSV = str =>
     str
