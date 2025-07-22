@@ -199,12 +199,19 @@
         oneTimeGrouped[person].push({ room: room, link: link });
       }
 
-      // Merge one-time tasks under "Any" day in grouped
-      for (const hkName in oneTimeGrouped) {
+      // Merge one-time tasks respecting their Day field into grouped
+      for (const task of tasksData) {
+        const day = task.Day || 'Any';
+        const hkName = getName(task.Housekeeper || task.Assigned || task['Assigned To']);
+        const room = task['Room Name'];
+        const link = task.FormLink || '';
+        if (!hkName || !room) continue;
+      
         if (!grouped[hkName]) grouped[hkName] = {};
-        if (!grouped[hkName]['Any']) grouped[hkName]['Any'] = [];
-        grouped[hkName]['Any'].push(...oneTimeGrouped[hkName]);
+        if (!grouped[hkName][day]) grouped[hkName][day] = [];
+        grouped[hkName][day].push({ room: room, link: link });
       }
+
 
       // Render the grouped data with links and status
       let totalRooms = 0, completedRooms = 0;
