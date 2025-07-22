@@ -95,21 +95,31 @@
 
       const weekNumber = getWeekOfMonth(monday);
       const scheduleFilename = `schedules/Colerain-Week${weekNumber}.csv`;
-      scheduleNameDiv.textContent = `Schedule: Colerain-Week${weekNumber}`;
+      const tasksFilename = `schedules/colerain-tasks.csv`;
+      scheduleNameDiv.textContent = `Schedule: Colerain-Week${weekNumber} + Additional Tasks`;
 
-      let scheduleText;
+      let scheduleText, tasksText;
       try {
-        const scheduleResponse = await fetch(scheduleFilename);
+        const [scheduleResponse, tasksResponse] = await Promise.all([
+          fetch(scheduleFilename),
+          fetch(tasksFilename),
+        ]);
+
         if (!scheduleResponse.ok) throw new Error(`File not found: ${scheduleFilename}`);
+        if (!tasksResponse.ok) throw new Error(`File not found: ${tasksFilename}`);
+
         scheduleText = await scheduleResponse.text();
+        tasksText = await tasksResponse.text();
       } catch (err) {
-        assignmentsDiv.innerHTML = `<p style="color:red;">Could not load schedule file: ${err.message}</p>`;
+        assignmentsDiv.innerHTML = `<p style="color:red;">Could not load schedule or tasks file: ${err.message}</p>`;
         progressBar.style.width = '0%';
         progressBar.textContent = '0%';
         return;
       }
 
       const scheduleData = parseCsv(scheduleText);
+      const tasksData = parseCsv(tasksText);
+
       const apiKey = '5b9a10e2092947d49dac84004ad149a2';
       const formId = '250955404825056';
       const roomFieldId = '18';
@@ -165,17 +175,41 @@
         return housekeeperNames[initial] || initial;
       }
 
+      // Add scheduleData rooms
       for (const item of scheduleData) {
         const day = item.Day;
         const hkInitial = item.Housekeeper;
         const room = item['Room Name'];
-        const link = item.Link;
+        const link = item.Link || '';
         if (!day || !hkInitial || !room) continue;
 
         const hkName = getName(hkInitial);
         if (!grouped[hkName]) grouped[hkName] = {};
         if (!grouped[hkName][day]) grouped[hkName][day] = [];
         grouped[hkName][day].push({ room, link });
+      }
+
+      // Add tasksData tasks (Day can be 'Any' or a specific day)
+      for (const task of tasksData) {
+        const day = task.Day;
+        const hkInitial = task.Housekeeper;
+        const room = task['Room Name'];
+        const link = task.FormLink || '';
+        if (!day || !hkInitial || !room) continue;
+
+        const hkName = getName(hkInitial);
+        if (!grouped[hkName]) grouped[hkName] = {};
+
+        if(day.toLowerCase() === 'any') {
+          // Add to every day for this housekeeper
+          weekdayOrder.forEach(d => {
+            if (!grouped[hkName][d]) grouped[hkName][d] = [];
+            grouped[hkName][d].push({ room, link });
+          });
+        } else {
+          if (!grouped[hkName][day]) grouped[hkName][day] = [];
+          grouped[hkName][day].push({ room, link });
+        }
       }
 
       let totalRooms = 0, completedRooms = 0;
@@ -221,7 +255,7 @@
       }
 
       if (completedRooms === totalRooms) {
-        html += `<p class="no-pending">All rooms are completed this week!</p>`;
+        html += `<p class="no-pending">All rooms and tasks are completed this week!</p>`;
       }
 
       assignmentsDiv.innerHTML = html;
