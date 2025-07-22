@@ -106,7 +106,9 @@ console.log(submissions);
 
 submissions.forEach((sub) => {
   const submittedRoom = sub.answers["18"]?.answer?.trim();
-  console.log("Submitted room:", submittedRoom, "on", sub.date);
+const submittedAt = new Date(sub.created_at);
+console.log("Submitted room:", submittedRoom, "on", submittedAt.toISOString());
+
 });
 
 
