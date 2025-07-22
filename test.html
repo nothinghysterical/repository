@@ -44,12 +44,12 @@
   <h1>Pending Room Assignments</h1>
   <button class="refresh-button" onclick="location.reload()">Refresh</button>
   <div class="progress-bar"><div id="progress" class="progress-fill">0%</div></div>
-  <div id="assignments">Loading...</div>
+  <div id="assignments"></div>
   <div class="schedule-name" id="scheduleName"></div>
 
   <script>
     const housekeeperNames = { A: 'Brian', B: 'Thomas', C: 'Lisa', D: 'Garrett' };
-    const weekdayOrder = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+    const weekdayOrder = ['Any', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
 
     function parseCsv(text) {
       const lines = text.trim().split('\n').filter(line => line.trim() !== '');
@@ -95,25 +95,27 @@
 
       const weekNumber = getWeekOfMonth(monday);
       const scheduleFilename = `schedules/Colerain-Week${weekNumber}.csv`;
-      const tasksFilename = `schedules/colerain-tasks.csv`;
-      scheduleNameDiv.textContent = `Schedule: Colerain-Week${weekNumber} + Additional Tasks`;
+      scheduleNameDiv.textContent = `Schedule: Colerain-Week${weekNumber}`;
 
-      let scheduleText, tasksText;
+      // Load main schedule CSV
+      let scheduleText;
       try {
-        const [scheduleResponse, tasksResponse] = await Promise.all([
-          fetch(scheduleFilename),
-          fetch(tasksFilename),
-        ]);
-
+        const scheduleResponse = await fetch(scheduleFilename);
         if (!scheduleResponse.ok) throw new Error(`File not found: ${scheduleFilename}`);
-        if (!tasksResponse.ok) throw new Error(`File not found: ${tasksFilename}`);
-
         scheduleText = await scheduleResponse.text();
+      } catch (err) {
+        assignmentsDiv.innerHTML = `<p style="color:red;">Could not load schedule file: ${err.message}</p>`;
+        return;
+      }
+
+      // Load additional tasks CSV
+      let tasksText;
+      try {
+        const tasksResponse = await fetch('schedules/colerain-tasks.csv');
+        if (!tasksResponse.ok) throw new Error('Could not load additional tasks file');
         tasksText = await tasksResponse.text();
       } catch (err) {
-        assignmentsDiv.innerHTML = `<p style="color:red;">Could not load schedule or tasks file: ${err.message}</p>`;
-        progressBar.style.width = '0%';
-        progressBar.textContent = '0%';
+        assignmentsDiv.innerHTML = `<p style="color:red;">Could not load additional tasks file: ${err.message}</p>`;
         return;
       }
 
@@ -124,14 +126,10 @@
       const formId = '250955404825056';
       const roomFieldId = '18';
 
-      let submissionsData = [];
-      try {
-        submissionsData = await fetch(`https://api.jotform.com/form/${formId}/submissions?apikey=${apiKey}&limit=1000`)
-          .then(res => res.json())
-          .then(json => json.content || []);
-      } catch (err) {
-        console.error('Error fetching submissions:', err);
-      }
+      // Fetch submissions from JotForm API
+      const submissionsData = await fetch(`https://api.jotform.com/form/${formId}/submissions?apiKey=${apiKey}&limit=1000`)
+        .then(res => res.json())
+        .then(json => json.content || []);
 
       const resetTimes = {};
       const validSubmissions = {};
@@ -170,80 +168,93 @@
         }
       }
 
+      // Group schedule rooms by housekeeper and day
       const grouped = {};
+      // Group additional tasks by housekeeper under "Any"
+      const oneTimeGrouped = {};
+
       function getName(initial) {
         return housekeeperNames[initial] || initial;
       }
 
-      // Add scheduleData rooms
       for (const item of scheduleData) {
         const day = item.Day;
         const hkInitial = item.Housekeeper;
         const room = item['Room Name'];
-        const link = item.Link || '';
         if (!day || !hkInitial || !room) continue;
 
         const hkName = getName(hkInitial);
         if (!grouped[hkName]) grouped[hkName] = {};
         if (!grouped[hkName][day]) grouped[hkName][day] = [];
-        grouped[hkName][day].push({ room, link });
+        grouped[hkName][day].push({ room: room, link: '' }); // No link in schedule CSV
       }
 
-      // Add tasksData tasks (Day can be 'Any' or a specific day)
       for (const task of tasksData) {
-        const day = task.Day;
-        const hkInitial = task.Housekeeper;
+        const person = getName(task.Housekeeper || task.Assigned || task['Assigned To']);
         const room = task['Room Name'];
         const link = task.FormLink || '';
-        if (!day || !hkInitial || !room) continue;
+        if (!person || !room) continue;
 
-        const hkName = getName(hkInitial);
-        if (!grouped[hkName]) grouped[hkName] = {};
-
-        if(day.toLowerCase() === 'any') {
-          // Add to every day for this housekeeper
-          weekdayOrder.forEach(d => {
-            if (!grouped[hkName][d]) grouped[hkName][d] = [];
-            grouped[hkName][d].push({ room, link });
-          });
-        } else {
-          if (!grouped[hkName][day]) grouped[hkName][day] = [];
-          grouped[hkName][day].push({ room, link });
-        }
+        if (!oneTimeGrouped[person]) oneTimeGrouped[person] = [];
+        oneTimeGrouped[person].push({ room: room, link: link });
       }
 
+      // Merge one-time tasks under "Any" day in grouped
+      for (const hkName in oneTimeGrouped) {
+        if (!grouped[hkName]) grouped[hkName] = {};
+        if (!grouped[hkName]['Any']) grouped[hkName]['Any'] = [];
+        grouped[hkName]['Any'].push(...oneTimeGrouped[hkName]);
+      }
+
+      // Render the grouped data with links and status
       let totalRooms = 0, completedRooms = 0;
       let html = '';
 
       Object.entries(grouped).forEach(([hkName, days]) => {
-        html += `<h2>${hkName}</h2>`;
+        let hkTotal = 0;
+        let hkCompleted = 0;
+
+        // Count hkTotal and hkCompleted across all days
         weekdayOrder.forEach(day => {
-          if (days[day]?.length) {
-            html += `<h3>${day}</h3><ul>`;
-            days[day].forEach(({ room, link }) => {
-              totalRooms++;
-              let extra = '';
-              let cls = '';
+          const rooms = days[day] || [];
+          hkTotal += rooms.length;
+          rooms.forEach(({ room }) => {
+            if (statusMap[room]) hkCompleted++;
+          });
+        });
 
-              if (statusMap[room]) {
-                completedRooms++;
-                cls = 'completed';
-                extra = ` - ${statusMap[room].date.toLocaleString()}`;
-              } else if (resetRooms.has(room)) {
-                cls = 'returned';
-                extra = ' - Returned to Schedule';
-              } else {
-                cls = 'pending';
-              }
+        const hkPending = hkTotal - hkCompleted;
+        html += `<h2>${hkName} (${hkPending} remaining)</h2>`;
 
-              const roomDisplay = link
-                ? `<a href="${link}" target="_blank" rel="noopener noreferrer">${room}</a>`
-                : room;
+        weekdayOrder.forEach(day => {
+          const rooms = days[day] || [];
+          if (!rooms.length) return;
 
-              html += `<li class="${cls}">${roomDisplay}${extra}</li>`;
-            });
-            html += '</ul>';
-          }
+          html += `<h3>${day}</h3><ul>`;
+          rooms.forEach(({ room, link }) => {
+            totalRooms++;
+            let extra = '';
+            let cls = '';
+
+            if (statusMap[room]) {
+              completedRooms++;
+              cls = 'completed';
+              extra = ` - ${statusMap[room].date.toLocaleString()}`;
+            } else if (resetRooms.has(room)) {
+              cls = 'returned';
+              extra = ' - Returned to Schedule';
+            } else {
+              cls = 'pending';
+            }
+
+            // If there's a link, make the room a hyperlink
+            const roomDisplay = link
+              ? `<a href="${link}" target="_blank" rel="noopener noreferrer">${room}</a>`
+              : room;
+
+            html += `<li class="${cls}">${roomDisplay}${extra}</li>`;
+          });
+          html += `</ul>`;
         });
       });
 
@@ -255,7 +266,7 @@
       }
 
       if (completedRooms === totalRooms) {
-        html += `<p class="no-pending">All rooms and tasks are completed this week!</p>`;
+        html += `<p class="no-pending">All rooms are completed this week!</p>`;
       }
 
       assignmentsDiv.innerHTML = html;
@@ -267,8 +278,6 @@
 
     load().catch(err => {
       document.getElementById('assignments').innerHTML = `<p style="color:red;">Error loading assignments: ${err.message}</p>`;
-      document.getElementById('progress').style.width = '0%';
-      document.getElementById('progress').textContent = '0%';
       console.error(err);
     });
 
