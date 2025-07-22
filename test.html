@@ -14,7 +14,7 @@
 
     .completed { color: green; }
     .completed::before {
-      content: "\2713 ";
+      content: "✓ ";
       color: green;
       font-weight: bold;
       margin-right: 0.25rem;
@@ -25,7 +25,7 @@
       font-weight: bold;
     }
     .returned::before {
-      content: "\21BA ";
+      content: "↺ ";
       color: orange;
       font-weight: bold;
       margin-right: 0.25rem;
@@ -44,7 +44,7 @@
   <h1>Pending Room Assignments</h1>
   <button class="refresh-button" onclick="location.reload()">Refresh</button>
   <div class="progress-bar"><div id="progress" class="progress-fill">0%</div></div>
-  <div id="assignments"></div>
+  <div id="assignments">Loading...</div>
   <div class="schedule-name" id="scheduleName"></div>
 
   <script>
@@ -104,6 +104,8 @@
         scheduleText = await scheduleResponse.text();
       } catch (err) {
         assignmentsDiv.innerHTML = `<p style="color:red;">Could not load schedule file: ${err.message}</p>`;
+        progressBar.style.width = '0%';
+        progressBar.textContent = '0%';
         return;
       }
 
@@ -112,9 +114,14 @@
       const formId = '250955404825056';
       const roomFieldId = '18';
 
-      const submissionsData = await fetch(`https://api.jotform.com/form/${formId}/submissions?apiKey=${apiKey}&limit=1000`)
-        .then(res => res.json())
-        .then(json => json.content || []);
+      let submissionsData = [];
+      try {
+        submissionsData = await fetch(`https://api.jotform.com/form/${formId}/submissions?apikey=${apiKey}&limit=1000`)
+          .then(res => res.json())
+          .then(json => json.content || []);
+      } catch (err) {
+        console.error('Error fetching submissions:', err);
+      }
 
       const resetTimes = {};
       const validSubmissions = {};
@@ -162,7 +169,7 @@
         const day = item.Day;
         const hkInitial = item.Housekeeper;
         const room = item['Room Name'];
-        const link = item['Link'] || '';
+        const link = item.Link;
         if (!day || !hkInitial || !room) continue;
 
         const hkName = getName(hkInitial);
@@ -195,19 +202,29 @@
                 cls = 'pending';
               }
 
-              const displayText = link ? `<a href="${link}" target="_blank">${room}</a>` : room;
-              html += `<li class="${cls}">${displayText}${extra}</li>`;
+              const roomDisplay = link
+                ? `<a href="${link}" target="_blank" rel="noopener noreferrer">${room}</a>`
+                : room;
+
+              html += `<li class="${cls}">${roomDisplay}${extra}</li>`;
             });
             html += '</ul>';
           }
         });
       });
 
-      if (completedRooms === totalRooms) {
-        assignmentsDiv.innerHTML = `<p class="no-pending">All rooms are completed this week!</p>`;
+      if (totalRooms === 0) {
+        assignmentsDiv.innerHTML = `<p class="no-pending">No assignments found.</p>`;
+        progressBar.style.width = '100%';
+        progressBar.textContent = '100%';
+        return;
       }
 
-      assignmentsDiv.innerHTML += html;
+      if (completedRooms === totalRooms) {
+        html += `<p class="no-pending">All rooms are completed this week!</p>`;
+      }
+
+      assignmentsDiv.innerHTML = html;
 
       const percent = totalRooms > 0 ? Math.round((completedRooms / totalRooms) * 100) : 100;
       progressBar.style.width = percent + '%';
@@ -216,6 +233,8 @@
 
     load().catch(err => {
       document.getElementById('assignments').innerHTML = `<p style="color:red;">Error loading assignments: ${err.message}</p>`;
+      document.getElementById('progress').style.width = '0%';
+      document.getElementById('progress').textContent = '0%';
       console.error(err);
     });
 
