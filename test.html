@@ -5,140 +5,254 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Pending Room Assignments</title>
   <style>
-    body { font-family: sans-serif; margin: 2rem; }
-    h2 { margin-top: 2rem; }
-    .done { text-decoration: line-through; color: green; }
-    .not-done { color: red; }
+    body { font-family: sans-serif; margin: 20px; }
+    h1 { text-align: center; margin-bottom: 1rem; }
+    h2 { margin-top: 2rem; margin-bottom: 0.5rem; }
+    h3 { margin-left: 1rem; margin-bottom: 0.25rem; color: #333; }
+    ul { margin-left: 2rem; margin-bottom: 1rem; list-style-type: none; padding-left: 1rem; }
+    li { margin-bottom: 0.25rem; }
+
+    .completed { color: green; }
+    .completed::before {
+      content: "✓ ";
+      color: green;
+      font-weight: bold;
+      margin-right: 0.25rem;
+    }
+
+    .returned {
+      color: orange;
+      font-weight: bold;
+    }
+    .returned::before {
+      content: "↺ ";
+      color: orange;
+      font-weight: bold;
+      margin-right: 0.25rem;
+    }
+
+    .pending { font-weight: bold; }
+
+    .no-pending { text-align: center; color: #666; margin-top: 2rem; font-style: italic; }
+    .progress-bar { width: 100%; background-color: #e0e0e0; border-radius: 10px; overflow: hidden; margin-bottom: 1rem; }
+    .progress-fill { height: 20px; background-color: #4caf50; width: 0%; transition: width 0.5s; text-align: center; color: white; line-height: 20px; }
+    .refresh-button { display: block; margin: 0 auto 1rem; padding: 0.5rem 1rem; background-color: #007bff; color: white; border: none; border-radius: 5px; cursor: pointer; }
+    .schedule-name { text-align: center; margin-top: 1rem; color: #666; font-style: italic; }
   </style>
 </head>
 <body>
   <h1>Pending Room Assignments</h1>
+  <button class="refresh-button" onclick="location.reload()">Refresh</button>
+  <div class="progress-bar"><div id="progress" class="progress-fill">0%</div></div>
   <div id="assignments">Loading...</div>
+  <div class="schedule-name" id="scheduleName"></div>
 
   <script>
+    // Map initials to friendly housekeeper names - adjust as needed
+    const housekeeperNames = { A: 'Brian', B: 'Thomas', C: 'Lisa', D: 'Garrett' };
+    const weekdayOrder = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
+
+    // Utility to parse CSV with commas
+    function parseCsv(text) {
+      const lines = text.trim().split('\n').filter(line => line.trim() !== '');
+      const headers = lines[0].split(',').map(h => h.trim());
+      return lines.slice(1).map(line => {
+        const values = line.split(',');
+        const obj = {};
+        headers.forEach((h, i) => obj[h] = values[i]?.trim() || '');
+        return obj;
+      });
+    }
+
+    // Get previous Monday at midnight
+    function getPreviousMonday() {
+      const d = new Date();
+      d.setHours(0, 0, 0, 0);
+      d.setDate(d.getDate() - ((d.getDay() + 6) % 7));
+      return d;
+    }
+
     async function load() {
-      const [roomData, jotformData, oneTimeData] = await Promise.all([
-        fetch('schedules/Colerain-Week.csv').then(r => r.text()),
-        fetch('https://api.jotform.com/form/250955404825056/submissions?apikey=5b9a10e2092947d49dac84004ad149a2').then(r => r.json()),
-        fetch('schedules/colerain-tasks.csv').then(r => r.text()),
-      ]);
+      const assignmentsDiv = document.getElementById('assignments');
+      const progressBar = document.getElementById('progress');
+      const scheduleNameDiv = document.getElementById('scheduleName');
 
-      const jotformSubmissions = jotformData.content || [];
+      // Show schedule name (fixed, or could be dynamic)
+      scheduleNameDiv.textContent = 'Schedule: Colerain-Week (from colerain csv files)';
 
-      const parseCSV = str =>
-        str.trim().split('\n').slice(1).map(line => {
-          const parts = line.split(',');
-          return {
-            room: (parts[0] || '').trim(),
-            day: (parts[1] || '').trim(),
-            person: (parts[2] || '').trim(),
-            link: (parts[3] || '').trim()
-          };
-        });
+      try {
+        // Fetch schedule tasks and one-time tasks
+        const [scheduleText, oneTimeText, jotformData] = await Promise.all([
+          fetch('schedules/Colerain-Week.csv').then(r => r.text()),
+          fetch('schedules/colerain-tasks.csv').then(r => r.text()),
+          fetch('https://api.jotform.com/form/250955404825056/submissions?apikey=5b9a10e2092947d49dac84004ad149a2').then(r => r.json()),
+        ]);
 
-      const parseOneTimeCSV = str =>
-        str.trim().split('\n').slice(1).map(line => {
-          const parts = line.split(',');
-          return {
-            'Room Name': (parts[0] || '').trim(),
-            'Assigned To': (parts[1] || '').trim(),
-            link: (parts[2] || '').trim()
-          };
-        });
+        // Parse CSVs
+        const scheduleData = parseCsv(scheduleText);
+        const oneTimeData = parseCsv(oneTimeText);
 
-      const tasks = parseCSV(roomData);
-      const oneTimeTasks = parseOneTimeCSV(oneTimeData);
-      const statusMap = {};
+        // Extract JotForm submissions content array
+        const submissions = jotformData.content || [];
 
-      const prevMonday = (() => {
-        const d = new Date();
-        d.setDate(d.getDate() - ((d.getDay() + 6) % 7));
-        d.setHours(0, 0, 0, 0);
-        return d;
-      })();
+        const prevMonday = getPreviousMonday();
 
-      jotformSubmissions.forEach(sub => {
-        const room = sub.answers?.['18']?.answer;
-        const dateStr = sub.created_at;
-        if (room && dateStr && new Date(dateStr) >= prevMonday) {
-          statusMap[room.trim()] = true;
-        }
-      });
+        // Track latest completion per room & track resets
+        const resetTimes = {};
+        const validSubmissions = {};
 
-      const grouped = {};
-      const oneTimeGrouped = {};
+        // Field id for room in JotForm answers
+        const roomFieldId = '18';
 
-      tasks.forEach(({ room, day, person, link }) => {
-        if (!grouped[person]) grouped[person] = {};
-        if (!grouped[person][day]) grouped[person][day] = [];
-        grouped[person][day].push({ room, link });
-      });
+        submissions.forEach(sub => {
+          const createdAt = new Date(sub.created_at);
+          if (createdAt < prevMonday) return; // ignore old
 
-      oneTimeTasks.forEach(task => {
-        const person = task['Assigned To'];
-        if (!oneTimeGrouped[person]) oneTimeGrouped[person] = [];
-        oneTimeGrouped[person].push(task);
-      });
+          let rawRoom = sub.answers?.[roomFieldId]?.answer?.trim() || '';
+          if (!rawRoom) return;
 
-      const weekdayOrder = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
-      const allHousekeepers = [...new Set([...Object.keys(grouped), ...Object.keys(oneTimeGrouped)])];
+          const roomName = rawRoom.replace(/reset/i, '').trim();
 
-      let html = '';
-      allHousekeepers.forEach(hk => {
-        const days = grouped[hk] || {};
-        const tasks = oneTimeGrouped[hk] || [];
-
-        let hkTotal = 0, hkCompleted = 0;
-        weekdayOrder.forEach(day => {
-          if (days[day]?.length) {
-            days[day].forEach(({ room }) => {
-              hkTotal++;
-              if (statusMap[room]) hkCompleted++;
-            });
+          if (/reset/i.test(rawRoom)) {
+            // This is a reset submission
+            if (!resetTimes[roomName] || createdAt > resetTimes[roomName]) {
+              resetTimes[roomName] = createdAt;
+            }
+          } else {
+            // Normal completion
+            if (!validSubmissions[roomName] || createdAt > validSubmissions[roomName].date) {
+              validSubmissions[roomName] = { date: createdAt, raw: rawRoom };
+            }
           }
         });
 
-        tasks.forEach(task => {
-          const room = task['Room Name'];
-          hkTotal++;
-          if (statusMap[room]) hkCompleted++;
+        // Determine final status: completed if last completion is after last reset or no reset
+        const statusMap = {};
+        for (const room in validSubmissions) {
+          if (!resetTimes[room] || validSubmissions[room].date > resetTimes[room]) {
+            statusMap[room] = { completed: true, date: validSubmissions[room].date };
+          }
+        }
+
+        // Rooms that have reset but no completion after reset => returned status
+        const returnedRooms = new Set();
+        for (const room in resetTimes) {
+          if (!statusMap[room]) returnedRooms.add(room);
+        }
+
+        // Group schedule tasks by housekeeper and day
+        const grouped = {};
+        function getName(initial) {
+          return housekeeperNames[initial] || initial;
+        }
+        scheduleData.forEach(item => {
+          const day = item.Day || item.day;
+          const hkInitial = item.Housekeeper || item.housekeeper;
+          const room = item['Room Name'] || item.room || item.Room || '';
+
+          if (!day || !hkInitial || !room) return;
+
+          const hkName = getName(hkInitial);
+          if (!grouped[hkName]) grouped[hkName] = {};
+          if (!grouped[hkName][day]) grouped[hkName][day] = [];
+          grouped[hkName][day].push(room);
         });
 
-        const hkRemaining = hkTotal - hkCompleted;
-        html += `<div class="housekeeper-section"><h2>${hk} (${hkRemaining} remaining)</h2>`;
+        // Group one-time tasks by assigned to
+        const oneTimeGrouped = {};
+        oneTimeData.forEach(task => {
+          const person = task['Assigned To'] || task['assigned to'] || '';
+          const room = task['Room Name'] || task['room name'] || '';
+          if (!person || !room) return;
+          if (!oneTimeGrouped[person]) oneTimeGrouped[person] = [];
+          oneTimeGrouped[person].push(room);
+        });
 
-        weekdayOrder.forEach(day => {
-          const items = days[day];
-          if (items?.length) {
+        // Combine all housekeepers from schedule and one-time
+        const allHousekeepers = Array.from(new Set([...Object.keys(grouped), ...Object.keys(oneTimeGrouped)]));
+
+        // Build HTML
+        let totalRooms = 0, completedRooms = 0;
+        let html = '';
+
+        allHousekeepers.forEach(hkName => {
+          html += `<h2>${hkName}</h2>`;
+
+          // Show scheduled rooms by day
+          weekdayOrder.forEach(day => {
+            const rooms = grouped[hkName]?.[day] || [];
+            if (rooms.length === 0) return;
+
             html += `<h3>${day}</h3><ul>`;
-            items.forEach(({ room, link }) => {
-              const done = statusMap[room];
-              const cls = done ? 'done' : 'not-done';
-              const display = link ? `<a href="${link}" target="_blank">${room}</a>` : room;
-              html += `<li class="${cls}">${display}</li>`;
+            rooms.forEach(room => {
+              totalRooms++;
+              let cls = 'pending', extra = '';
+
+              if (statusMap[room]) {
+                cls = 'completed';
+                completedRooms++;
+                extra = ` - ${statusMap[room].date.toLocaleString()}`;
+              } else if (returnedRooms.has(room)) {
+                cls = 'returned';
+                extra = ' - Returned to Schedule';
+              }
+
+              html += `<li class="${cls}">${room}${extra}</li>`;
             });
-            html += '</ul>';
+            html += `</ul>`;
+          });
+
+          // Show one-time tasks
+          const oneTimeRooms = oneTimeGrouped[hkName] || [];
+          if (oneTimeRooms.length > 0) {
+            html += `<h3>Additional Rooms</h3><ul>`;
+            oneTimeRooms.forEach(room => {
+              totalRooms++;
+              let cls = 'pending', extra = '';
+              if (statusMap[room]) {
+                cls = 'completed';
+                completedRooms++;
+                extra = ` - ${statusMap[room].date.toLocaleString()}`;
+              } else if (returnedRooms.has(room)) {
+                cls = 'returned';
+                extra = ' - Returned to Schedule';
+              }
+              html += `<li class="${cls}">${room}${extra}</li>`;
+            });
+            html += `</ul>`;
           }
         });
 
-        if (tasks.length) {
-          html += `<h3>Additional Rooms</h3><ul>`;
-          tasks.forEach(({ 'Room Name': room, link }) => {
-            const done = statusMap[room];
-            const cls = done ? 'done' : 'not-done';
-            const display = link ? `<a href="${link}" target="_blank">${room}</a>` : room;
-            html += `<li class="${cls}">${display}</li>`;
-          });
-          html += '</ul>';
+        if (totalRooms === 0) {
+          assignmentsDiv.innerHTML = `<p class="no-pending">No assignments found.</p>`;
+          progressBar.style.width = '100%';
+          progressBar.textContent = '100%';
+          return;
         }
 
-        html += '</div>';
-      });
+        if (completedRooms === totalRooms) {
+          html += `<p class="no-pending">All rooms are completed this week!</p>`;
+        }
 
-      document.getElementById('assignments').innerHTML = html;
+        assignmentsDiv.innerHTML = html;
+
+        // Update progress bar
+        const percent = Math.round((completedRooms / totalRooms) * 100);
+        progressBar.style.width = percent + '%';
+        progressBar.textContent = percent + '%';
+
+      } catch (err) {
+        assignmentsDiv.innerHTML = `<p style="color:red;">Error loading data: ${err.message}</p>`;
+        progressBar.style.width = '0%';
+        progressBar.textContent = '0%';
+        console.error(err);
+      }
     }
 
     load();
+
+    // Auto refresh every 5 minutes
+    setInterval(() => location.reload(), 300000);
   </script>
 </body>
 </html>
