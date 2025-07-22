@@ -20,16 +20,16 @@
       margin-right: 0.25rem;
     }
 
-.returned {
-  color: orange;
-  font-weight: bold;
-}
-.returned::before {
-  content: "↺ ";
-  color: orange;
-  font-weight: bold;
-  margin-right: 0.25rem;
-}
+    .returned {
+      color: orange;
+      font-weight: bold;
+    }
+    .returned::before {
+      content: "↺ ";
+      color: orange;
+      font-weight: bold;
+      margin-right: 0.25rem;
+    }
 
     .pending { font-weight: bold; }
 
@@ -47,177 +47,216 @@
   <div id="assignments"></div>
   <div class="schedule-name" id="scheduleName"></div>
 
-  <script>
-    const housekeeperNames = { A: 'Brian', B: 'Thomas', C: 'Lisa', D: 'Garrett' };
-    const weekdayOrder = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+<script>
+  const housekeeperNames = { A: 'Brian', B: 'Thomas', C: 'Lisa', D: 'Garrett' };
+  const weekdayOrder = ['Any', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
 
-    function parseCsv(text) {
-      const lines = text.trim().split('\n').filter(line => line.trim() !== '');
-      const headers = lines[0].split(/\t|,/).map(h => h.trim());
-      return lines.slice(1).map(line => {
-        const values = line.split(/\t|,/);
-        const obj = {};
-        headers.forEach((h, i) => obj[h] = values[i]?.trim() || '');
-        return obj;
-      });
+  function parseCsv(text) {
+    const lines = text.trim().split('\n').filter(line => line.trim() !== '');
+    const headers = lines[0].split(/\t|,/).map(h => h.trim());
+    return lines.slice(1).map(line => {
+      const values = line.split(/\t|,/);
+      const obj = {};
+      headers.forEach((h, i) => obj[h] = values[i]?.trim() || '');
+      return obj;
+    });
+  }
+
+  function getMonday(date = new Date()) {
+    const d = new Date(date);
+    const day = d.getDay();
+    const diff = (day === 0 ? -6 : 1) - day;
+    d.setHours(0, 0, 0, 0);
+    d.setDate(d.getDate() + diff);
+    return d;
+  }
+
+  function getWeekOfMonth(mondayDate) {
+    const year = mondayDate.getFullYear();
+    const month = mondayDate.getMonth();
+    const firstOfMonth = new Date(year, month, 1);
+    let mondayCount = 0;
+    let current = new Date(firstOfMonth);
+    while (current <= mondayDate) {
+      if (current.getDay() === 1) mondayCount++;
+      current.setDate(current.getDate() + 1);
+    }
+    return mondayCount;
+  }
+
+  async function load() {
+    const assignmentsDiv = document.getElementById('assignments');
+    const progressBar = document.getElementById('progress');
+    const scheduleNameDiv = document.getElementById('scheduleName');
+
+    const monday = getMonday();
+    const sunday = new Date(monday);
+    sunday.setDate(monday.getDate() + 6);
+
+    const weekNumber = getWeekOfMonth(monday);
+    const scheduleFilename = `schedules/Colerain-Week${weekNumber}.csv`;
+    scheduleNameDiv.textContent = `Schedule: Colerain-Week${weekNumber}`;
+
+    let scheduleText, tasksText;
+    try {
+      const scheduleResponse = await fetch(scheduleFilename);
+      if (!scheduleResponse.ok) throw new Error(`File not found: ${scheduleFilename}`);
+      scheduleText = await scheduleResponse.text();
+    } catch (err) {
+      assignmentsDiv.innerHTML = `<p style="color:red;">Could not load schedule file: ${err.message}</p>`;
+      return;
     }
 
-    function getMonday(date = new Date()) {
-      const d = new Date(date);
-      const day = d.getDay();
-      const diff = (day === 0 ? -6 : 1) - day;
-      d.setHours(0, 0, 0, 0);
-      d.setDate(d.getDate() + diff);
-      return d;
+    try {
+      const tasksResponse = await fetch('schedules/colerain-tasks.csv');
+      if (!tasksResponse.ok) throw new Error('Could not load additional tasks file');
+      tasksText = await tasksResponse.text();
+    } catch (err) {
+      assignmentsDiv.innerHTML = `<p style="color:red;">Could not load additional tasks file: ${err.message}</p>`;
+      return;
     }
 
-    function getWeekOfMonth(mondayDate) {
-      const year = mondayDate.getFullYear();
-      const month = mondayDate.getMonth();
-      const firstOfMonth = new Date(year, month, 1);
-      let mondayCount = 0;
-      let current = new Date(firstOfMonth);
-      while (current <= mondayDate) {
-        if (current.getDay() === 1) mondayCount++;
-        current.setDate(current.getDate() + 1);
+    const scheduleData = parseCsv(scheduleText);
+    const tasksData = parseCsv(tasksText);
+
+    const apiKey = '5b9a10e2092947d49dac84004ad149a2';
+    const formId = '250955404825056';
+    const roomFieldId = '18';
+
+    const submissionsData = await fetch(`https://api.jotform.com/form/${formId}/submissions?apiKey=${apiKey}&limit=1000`)
+      .then(res => res.json())
+      .then(json => json.content || []);
+
+    const resetTimes = {};
+    const validSubmissions = {};
+
+    for (const sub of submissionsData) {
+      const createdAt = new Date(sub.created_at);
+      const roomRaw = sub.answers?.[roomFieldId]?.answer?.trim() || '';
+      const roomName = roomRaw.replace(/reset/i, '').trim();
+      if (!roomName) continue;
+
+      if (createdAt < monday || createdAt > sunday) continue;
+
+      if (/reset/i.test(roomRaw)) {
+        if (!resetTimes[roomName] || createdAt > resetTimes[roomName]) {
+          resetTimes[roomName] = createdAt;
+        }
+      } else {
+        if (!validSubmissions[roomName] || createdAt > validSubmissions[roomName].date) {
+          validSubmissions[roomName] = { date: createdAt, raw: roomRaw };
+        }
       }
-      return mondayCount;
     }
 
-    async function load() {
-      const assignmentsDiv = document.getElementById('assignments');
-      const progressBar = document.getElementById('progress');
-      const scheduleNameDiv = document.getElementById('scheduleName');
-
-      const monday = getMonday();
-      const sunday = new Date(monday);
-      sunday.setDate(monday.getDate() + 6);
-
-      const weekNumber = getWeekOfMonth(monday);
-      const scheduleFilename = `schedules/Colerain-Week${weekNumber}.csv`;
-      scheduleNameDiv.textContent = `Schedule: Colerain-Week${weekNumber}`;
-
-      let scheduleText;
-      try {
-        const scheduleResponse = await fetch(scheduleFilename);
-        if (!scheduleResponse.ok) throw new Error(`File not found: ${scheduleFilename}`);
-        scheduleText = await scheduleResponse.text();
-      } catch (err) {
-        assignmentsDiv.innerHTML = `<p style="color:red;">Could not load schedule file: ${err.message}</p>`;
-        return;
+    const statusMap = {};
+    for (const room in validSubmissions) {
+      const submissionDate = validSubmissions[room].date;
+      if (!resetTimes[room] || submissionDate > resetTimes[room]) {
+        statusMap[room] = { completed: true, date: submissionDate };
       }
+    }
 
-      const scheduleData = parseCsv(scheduleText);
-      const apiKey = '5b9a10e2092947d49dac84004ad149a2';
-      const formId = '250955404825056';
-      const roomFieldId = '18';
-
-      const submissionsData = await fetch(`https://api.jotform.com/form/${formId}/submissions?apiKey=${apiKey}&limit=1000`)
-        .then(res => res.json())
-        .then(json => json.content || []);
-
-      const resetTimes = {};
-      const validSubmissions = {};
-
-      for (const sub of submissionsData) {
-        const createdAt = new Date(sub.created_at);
-        const roomRaw = sub.answers?.[roomFieldId]?.answer?.trim() || '';
-        const roomName = roomRaw.replace(/reset/i, '').trim();
-        if (!roomName) continue;
-
-        if (createdAt < monday || createdAt > sunday) continue;
-
-        if (/reset/i.test(roomRaw)) {
-          if (!resetTimes[roomName] || createdAt > resetTimes[roomName]) {
-            resetTimes[roomName] = createdAt;
-          }
-        } else {
-          if (!validSubmissions[roomName] || createdAt > validSubmissions[roomName].date) {
-            validSubmissions[roomName] = { date: createdAt, raw: roomRaw };
-          }
-        }
+    const resetRooms = new Set();
+    for (const room in resetTimes) {
+      if (!statusMap[room]) {
+        resetRooms.add(room);
       }
+    }
 
-      const statusMap = {};
-      for (const room in validSubmissions) {
-        const submissionDate = validSubmissions[room].date;
-        if (!resetTimes[room] || submissionDate > resetTimes[room]) {
-          statusMap[room] = { completed: true, date: submissionDate };
-        }
-      }
+    const grouped = {};
 
-      const resetRooms = new Set();
-      for (const room in resetTimes) {
-        if (!statusMap[room]) {
-          resetRooms.add(room);
-        }
-      }
+    function getName(initial) {
+      return housekeeperNames[initial] || initial;
+    }
 
-      const grouped = {};
-      function getName(initial) {
-        return housekeeperNames[initial] || initial;
-      }
+    const combinedTasks = [...scheduleData, ...tasksData];
 
-      for (const item of scheduleData) {
-        const day = item.Day;
-        const hkInitial = item.Housekeeper;
-        const room = item['Room Name'];
-        if (!day || !hkInitial || !room) continue;
+    for (const task of combinedTasks) {
+      const day = task.Day || 'Any';
+      const hk = getName(task.Housekeeper || task.Assigned || task['Assigned To']);
+      const room = task['Room Name'];
+      const link = task.FormLink || task.Link || '';
+      if (!hk || !room) continue;
 
-        const hkName = getName(hkInitial);
-        if (!grouped[hkName]) grouped[hkName] = {};
-        if (!grouped[hkName][day]) grouped[hkName][day] = [];
-        grouped[hkName][day].push(room);
-      }
+      if (!grouped[hk]) grouped[hk] = {};
+      if (!grouped[hk][day]) grouped[hk][day] = [];
+      grouped[hk][day].push({ room: room, link: link });
+    }
 
-      let totalRooms = 0, completedRooms = 0;
-      let html = '';
+    let totalRooms = 0, completedRooms = 0;
+    let html = '';
 
-      Object.entries(grouped).forEach(([hkName, days]) => {
-        html += `<h2>${hkName}</h2>`;
-        weekdayOrder.forEach(day => {
-          if (days[day]?.length) {
-            html += `<h3>${day}</h3><ul>`;
-            days[day].forEach(room => {
-              totalRooms++;
-              let extra = '';
-              let cls = '';
+    Object.entries(grouped).forEach(([hkName, days]) => {
+      let hkTotal = 0;
+      let hkCompleted = 0;
 
-              if (statusMap[room]) {
-                completedRooms++;
-                cls = 'completed';
-                extra = ` - ${statusMap[room].date.toLocaleString()}`;
-              } else if (resetRooms.has(room)) {
-                cls = 'returned';
-                extra = ' - Returned to Schedule';
-              } else {
-                cls = 'pending';
-              }
-
-              html += `<li class="${cls}">${room}${extra}</li>`;
-            });
-            html += '</ul>';
-          }
+      weekdayOrder.forEach(day => {
+        const rooms = days[day] || [];
+        hkTotal += rooms.length;
+        rooms.forEach(({ room }) => {
+          if (statusMap[room]) hkCompleted++;
         });
       });
 
-      if (completedRooms === totalRooms) {
-        assignmentsDiv.innerHTML = `<p class="no-pending">All rooms are completed this week!</p>`;
-      }
+      const hkPending = hkTotal - hkCompleted;
+      html += `<h2>${hkName} (${hkPending} remaining)</h2>`;
 
-      assignmentsDiv.innerHTML += html;
+      weekdayOrder.forEach(day => {
+        const rooms = days[day] || [];
+        if (!rooms.length) return;
 
-      const percent = totalRooms > 0 ? Math.round((completedRooms / totalRooms) * 100) : 100;
-      progressBar.style.width = percent + '%';
-      progressBar.textContent = percent + '%';
-    }
+        html += `<h3>${day}</h3><ul>`;
+        rooms.forEach(({ room, link }) => {
+          totalRooms++;
+          let extra = '';
+          let cls = '';
 
-    load().catch(err => {
-      document.getElementById('assignments').innerHTML = `<p style="color:red;">Error loading assignments: ${err.message}</p>`;
-      console.error(err);
+          if (statusMap[room]) {
+            completedRooms++;
+            cls = 'completed';
+            extra = ` - ${statusMap[room].date.toLocaleString()}`;
+          } else if (resetRooms.has(room)) {
+            cls = 'returned';
+            extra = ' - Returned to Schedule';
+          } else {
+            cls = 'pending';
+          }
+
+          const roomDisplay = link
+            ? `<a href="${link}" target="_blank" rel="noopener noreferrer">${room}</a>`
+            : room;
+
+          html += `<li class="${cls}">${roomDisplay}${extra}</li>`;
+        });
+        html += `</ul>`;
+      });
     });
 
-    setInterval(() => location.reload(), 300000); // Refresh every 5 minutes
-  </script>
+    if (totalRooms === 0) {
+      assignmentsDiv.innerHTML = `<p class="no-pending">No assignments found.</p>`;
+      progressBar.style.width = '100%';
+      progressBar.textContent = '100%';
+      return;
+    }
+
+    if (completedRooms === totalRooms) {
+      html += `<p class="no-pending">All rooms are completed this week!</p>`;
+    }
+
+    assignmentsDiv.innerHTML = html;
+
+    const percent = totalRooms > 0 ? Math.round((completedRooms / totalRooms) * 100) : 100;
+    progressBar.style.width = percent + '%';
+    progressBar.textContent = percent + '%';
+  }
+
+  load().catch(err => {
+    document.getElementById('assignments').innerHTML = `<p style="color:red;">Error loading assignments: ${err.message}</p>`;
+    console.error(err);
+  });
+
+  setInterval(() => location.reload(), 300000); // Refresh every 5 minutes
+</script>
 </body>
 </html>
