@@ -94,8 +94,8 @@
     sunday.setDate(monday.getDate() + 6);
 
     const weekNumber = getWeekOfMonth(monday);
-    const scheduleFilename = `schedules/Colerain-Week${weekNumber}.csv`;
-    scheduleNameDiv.textContent = `Schedule: Colerain-Week${weekNumber}`;
+    const scheduleFilename = `schedules/Ross-Week${weekNumber}.csv`;
+    scheduleNameDiv.textContent = `Schedule: Ross-Week${weekNumber}`;
 
     let scheduleText, tasksText;
     try {
@@ -108,7 +108,7 @@
     }
 
     try {
-      const tasksResponse = await fetch('schedules/colerain-tasks.csv');
+      const tasksResponse = await fetch('schedules/ross-tasks.csv');
       if (!tasksResponse.ok) throw new Error('Could not load additional tasks file');
       tasksText = await tasksResponse.text();
     } catch (err) {
