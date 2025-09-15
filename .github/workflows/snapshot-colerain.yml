@@ -1,9 +1,9 @@
-name: Weekly Colerain Snapshot
+name: Weekly Snapshot
 
 on:
   schedule:
-    - cron: "0 19 * * 0"   # Every Sunday 7 PM UTC (adjust if needed)
-  workflow_dispatch:        # Allow manual run
+    - cron: "0 19 * * 0"   # Every Sunday 7 PM UTC
+  workflow_dispatch:
 
 jobs:
   snapshot:
@@ -17,10 +17,11 @@ jobs:
         with:
           node-version: "20"
 
-      - name: Install Playwright
+      - name: Install Playwright + Browsers
         run: |
           npm init -y
           npm install playwright
+          npx playwright install --with-deps
 
       - name: Take Snapshot
         run: |
@@ -32,15 +33,12 @@ jobs:
             const browser = await chromium.launch();
             const page = await browser.newPage();
 
-            // load your live GitHub Pages schedule
             await page.goto("https://nothinghysterical.github.io/repository/schedule-colerain.html", {
               waitUntil: "networkidle"
             });
 
-            // grab the rendered HTML
             const html = await page.content();
 
-            // timestamped filename
             const now = new Date();
             const filename = `snapshots/snapshot-${now.toISOString().slice(0,10)}.html`;
 
