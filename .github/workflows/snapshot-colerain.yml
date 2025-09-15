@@ -1,29 +1,32 @@
-name: Weekly Snapshot
+name: Weekly Schedule Snapshot
 
 on:
   schedule:
-    - cron: "0 19 * * 0"   # Every Sunday 7 PM UTC
-  workflow_dispatch:
+    - cron: "0 2 * * 1" # Every Monday at 2 AM UTC
+  workflow_dispatch: # allow manual runs too
+
+permissions:
+  contents: write
 
 jobs:
   snapshot:
     runs-on: ubuntu-latest
+
     steps:
       - name: Checkout repo
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v3
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
         with:
-          node-version: "20"
+          node-version: 20
 
-      - name: Install Playwright + Browsers
+      - name: Install dependencies
         run: |
-          npm init -y
           npm install playwright
-          npx playwright install --with-deps
+          npx playwright install --with-deps chromium
 
-      - name: Take Snapshot
+      - name: Run snapshot script
         run: |
           node <<'EOF'
           const { chromium } = require("playwright");
@@ -49,7 +52,7 @@ jobs:
           })();
           EOF
 
-      - name: Commit snapshot
+      - name: Commit and push snapshot
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
