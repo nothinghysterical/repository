@@ -1,0 +1,60 @@
+name: Weekly Colerain Snapshot
+
+on:
+  schedule:
+    - cron: "0 19 * * 0"   # Every Sunday 7 PM UTC (adjust if needed)
+  workflow_dispatch:        # Allow manual run
+
+jobs:
+  snapshot:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v3
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: "20"
+
+      - name: Install Playwright
+        run: |
+          npm init -y
+          npm install playwright
+
+      - name: Take Snapshot
+        run: |
+          node <<'EOF'
+          const { chromium } = require("playwright");
+          const fs = require("fs");
+
+          (async () => {
+            const browser = await chromium.launch();
+            const page = await browser.newPage();
+
+            // load your live GitHub Pages schedule
+            await page.goto("https://nothinghysterical.github.io/repository/schedule-colerain.html", {
+              waitUntil: "networkidle"
+            });
+
+            // grab the rendered HTML
+            const html = await page.content();
+
+            // timestamped filename
+            const now = new Date();
+            const filename = `snapshots/snapshot-${now.toISOString().slice(0,10)}.html`;
+
+            fs.mkdirSync("snapshots", { recursive: true });
+            fs.writeFileSync(filename, html);
+
+            await browser.close();
+          })();
+          EOF
+
+      - name: Commit snapshot
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add snapshots/
+          git commit -m "Add weekly snapshot" || echo "No changes"
+          git push
