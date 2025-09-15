@@ -1,0 +1,68 @@
+name: Weekly Ross Schedule Snapshot
+
+on:
+  schedule:
+    - cron: "0 2 * * 1" # Every Monday at 2 AM UTC
+  workflow_dispatch: # allow manual runs
+
+permissions:
+  contents: write
+
+jobs:
+  snapshot:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install dependencies
+        run: |
+          npm install playwright
+          npx playwright install --with-deps chromium
+
+      - name: Run snapshot script
+        run: |
+          node <<'EOF'
+          const { chromium } = require("playwright");
+          const fs = require("fs");
+
+          (async () => {
+            const browser = await chromium.launch();
+            const page = await browser.newPage();
+
+            // Load your live GitHub Pages schedule
+            await page.goto("https://nothinghysterical.github.io/repository/schedule-ross.html", {
+              waitUntil: "networkidle"
+            });
+
+            // Extract frozen DOM (strip scripts so it won't reload)
+            const html = await page.evaluate(() => {
+              const doc = document.documentElement.cloneNode(true);
+              doc.querySelectorAll("script").forEach(s => s.remove());
+              return "<!DOCTYPE html>\n" + doc.outerHTML;
+            });
+
+            // Save with timestamp
+            const now = new Date();
+            const filename = `snapshots/snapshot-${now.toISOString().slice(0,10)}.html`;
+
+            fs.mkdirSync("snapshots", { recursive: true });
+            fs.writeFileSync(filename, html);
+
+            await browser.close();
+          })();
+          EOF
+
+      - name: Commit and push snapshot
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add snapshots/
+          git commit -m "Add weekly snapshot" || echo "No changes"
+          git push
