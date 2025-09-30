@@ -2,7 +2,7 @@ name: Weekly Colerain Schedule Snapshot
 
 on:
   schedule:
-    - cron: "0 2 * * 1" # Every Monday at 2 AM UTC
+     - cron: "0 22 * * 0" # Every Sunday at 22:00 UTC (~6 PM ET during DST, 5 PM otherwise)
   workflow_dispatch: # allow manual runs
 
 permissions:
@@ -50,7 +50,7 @@ jobs:
 
             // Save with timestamp
             const now = new Date();
-            const filename = `snapshots/snapshot-${now.toISOString().slice(0,10)}.html`;
+            const filename = `snapshots/snapshot-Colerain-${now.toISOString().slice(0,10)}.html`;
 
             fs.mkdirSync("snapshots", { recursive: true });
             fs.writeFileSync(filename, html);
