@@ -2,7 +2,7 @@ name: Weekly Combined Schedule Snapshot
 
 on:
   schedule:
-    - cron: "0 22 * * 0" # Every Sunday at 22:00 UTC (~6 PM ET during DST, 5 PM otherwise)
+    - cron: "0 3 * * *" # Every day at 3 AM UTC (~10 PM ET in winter)
   workflow_dispatch:
 
 permissions:
