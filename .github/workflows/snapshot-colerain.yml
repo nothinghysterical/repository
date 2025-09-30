@@ -1,17 +1,16 @@
-name: Weekly Colerain Schedule Snapshot
+name: Weekly Combined Schedule Snapshot
 
 on:
   schedule:
-     - cron: "0 22 * * 0" # Every Sunday at 22:00 UTC (~6 PM ET during DST, 5 PM otherwise)
-  workflow_dispatch: # allow manual runs
+    - cron: "0 22 * * 0" # Every Sunday at 22:00 UTC (~6 PM ET during DST, 5 PM otherwise)
+  workflow_dispatch:
 
 permissions:
   contents: write
 
 jobs:
-  snapshot:
+  setup-and-snapshot:
     runs-on: ubuntu-latest
-
     steps:
       - name: Checkout repo
         uses: actions/checkout@v4
@@ -20,13 +19,14 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 20
+          cache: 'npm'
 
       - name: Install dependencies
         run: |
           npm install playwright
           npx playwright install --with-deps chromium
 
-      - name: Run snapshot script
+      - name: Run combined snapshot
         run: |
           node <<'EOF'
           const { chromium } = require("playwright");
@@ -36,33 +36,66 @@ jobs:
             const browser = await chromium.launch();
             const page = await browser.newPage();
 
-            // Load your live GitHub Pages schedule
-            await page.goto("https://nothinghysterical.github.io/repository/schedule-colerain.html", {
-              waitUntil: "networkidle"
-            });
+            const schedules = [
+              { name: "Colerain", url: "https://nothinghysterical.github.io/repository/schedule-colerain.html" },
+              { name: "Ross", url: "https://nothinghysterical.github.io/repository/schedule-ross.html" }
+            ];
 
-            // Extract frozen DOM (strip scripts so it won't reload)
-            const html = await page.evaluate(() => {
-              const doc = document.documentElement.cloneNode(true);
-              doc.querySelectorAll("script").forEach(s => s.remove());
-              return "<!DOCTYPE html>\n" + doc.outerHTML;
-            });
+            const sections = [];
 
-            // Save with timestamp
             const now = new Date();
-            const filename = `snapshots/snapshot-Colerain-${now.toISOString().slice(0,10)}.html`;
+            const timestamp = now.toLocaleString('en-US', { timeZone: 'America/New_York' });
+
+            for (const schedule of schedules) {
+              await page.goto(schedule.url, { waitUntil: "networkidle" });
+
+              const htmlContent = await page.evaluate(() => {
+                const doc = document.documentElement.cloneNode(true);
+                doc.querySelectorAll("script").forEach(s => s.remove());
+                return doc.querySelector("body").innerHTML;
+              });
+
+              sections.push(`
+                <section>
+                  <h1 style="text-align:center;">${schedule.name} Schedule</h1>
+                  <p style="text-align:center; color: #555;">Snapshot taken: ${timestamp}</p>
+                  ${htmlContent}
+                  <hr style="margin: 40px 0;">
+                </section>
+              `);
+            }
+
+            const fullHtml = `
+              <!DOCTYPE html>
+              <html lang="en">
+                <head>
+                  <meta charset="UTF-8">
+                  <title>Combined Schedule Snapshot - ${now.toISOString().slice(0,10)}</title>
+                  <style>
+                    body { font-family: Arial, sans-serif; margin: 20px; }
+                    h1 { background-color: #f0f0f0; padding: 10px; border-radius: 5px; }
+                    hr { border: 1px solid #ccc; }
+                    p { margin: 5px 0 15px 0; }
+                  </style>
+                </head>
+                <body>
+                  ${sections.join("\n")}
+                </body>
+              </html>
+            `;
 
             fs.mkdirSync("snapshots", { recursive: true });
-            fs.writeFileSync(filename, html);
+            const filename = `snapshots/snapshot-Combined-${now.toISOString().slice(0,10)}.html`;
+            fs.writeFileSync(filename, fullHtml);
 
             await browser.close();
           })();
           EOF
 
-      - name: Commit and push snapshot
+      - name: Commit and push combined snapshot
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add snapshots/
-          git commit -m "Add weekly snapshot" || echo "No changes"
+          git commit -m "Add weekly combined snapshot" || echo "No changes"
           git push
