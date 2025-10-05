@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="en"><head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Pending Room Assignments</title>
+  <style>
+    body { font-family: sans-serif; margin: 20px; }
+    h1 { text-align: center; margin-bottom: 1rem; }
+    h2 { margin-top: 2rem; margin-bottom: 0.5rem; }
+    h3 { margin-left: 1rem; margin-bottom: 0.25rem; color: #333; }
+    ul { margin-left: 2rem; margin-bottom: 1rem; list-style-type: none; padding-left: 1rem; }
+    li { margin-bottom: 0.25rem; }
+
+    .completed { color: green; }
+    .completed::before {
+      content: "✓ ";
+      color: green;
+      font-weight: bold;
+      margin-right: 0.25rem;
+    }
+
+    .returned {
+      color: orange;
+      font-weight: bold;
+    }
+    .returned::before {
+      content: "↺ ";
+      color: orange;
+      font-weight: bold;
+      margin-right: 0.25rem;
+    }
+
+    .pending { font-weight: bold; }
+
+    .no-pending { text-align: center; color: #666; margin-top: 2rem; font-style: italic; }
+    .progress-bar { width: 100%; background-color: #e0e0e0; border-radius: 10px; overflow: hidden; margin-bottom: 1rem; }
+    .progress-fill { height: 20px; background-color: #4caf50; width: 0%; transition: width 0.5s; text-align: center; color: white; line-height: 20px; }
+    .refresh-button { display: inline-block; margin: 0 auto 1rem; padding: 0.5rem 1rem; background-color: #007bff; color: white; border: none; border-radius: 5px; cursor: pointer; }
+    .schedule-name { text-align: center; margin-top: 2rem; color: #666; }
+  </style>
+</head>
+<body>
+  <h1>Pending Room Assignments</h1>
+  <button class="refresh-button" onclick="location.reload()">Refresh</button>
+  <div class="progress-bar"><div id="progress" class="progress-fill" style="width: 71%;">71%</div></div>
+  <div id="assignments"><h2>Lisa (6 remaining)</h2><h3>Monday</h3><ul><li class="pending"><a href="https://form.jotform.com/250955404825056?space=Building Trash" target="_blank" rel="noopener noreferrer">Building Trash</a></li><li class="completed">Bathroom 128-R - 10/2/2025, 3:14:59 PM</li><li class="completed">Bathroom 129-R - 10/2/2025, 3:15:15 PM</li><li class="completed">Bathroom 132-R - 10/2/2025, 3:15:48 PM</li><li class="completed">Bathroom 131-R - 10/2/2025, 3:15:31 PM</li><li class="completed">Hallway 102-R - 10/3/2025, 11:49:58 AM</li><li class="completed">Room 104-R - 9/30/2025, 8:44:09 AM</li><li class="completed">Room 105-R - 9/30/2025, 9:32:52 AM</li><li class="completed">Bathroom 106-R - 9/30/2025, 9:33:13 AM</li><li class="completed">Room 107-R - 9/30/2025, 9:33:29 AM</li><li class="completed">Hallway 103-R - 9/30/2025, 9:50:50 AM</li><li class="completed">Room 110-R - 9/30/2025, 9:46:18 AM</li><li class="pending">Bathroom 108-R</li><li class="pending">Bathroom 109-R</li><li class="completed">Room 111-112-R - 10/3/2025, 9:21:11 AM</li><li class="completed">Kitchen 113-R - 10/3/2025, 9:39:37 AM</li><li class="completed">Bathroom 114-R - 10/3/2025, 10:18:56 AM</li><li class="completed">Bathroom 115-R - 10/3/2025, 10:19:08 AM</li><li class="pending">Room 117-R</li><li class="pending">Auditorium 119-R</li><li class="pending">Room 121-R</li></ul></div>
+  <div class="schedule-name" id="scheduleName">Schedule: Ross-Week5</div>
+
+
+
+
+</body></html>
