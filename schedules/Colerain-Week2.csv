@@ -22,10 +22,14 @@ Tuesday,D,Bathroom Zone,45,
 Wednesday,D,Hallway 72-1,60,
 Wednesday,D,Room 124,30,
 Wednesday,D,Room 127,30,
+Wednesday,D,Room 128,30,
+Wednesday,D,Room 130,30,
+Wednesday,D,Room 134,30,
 Wednesday,D,Janitorial 72-1,20,
 Wednesday,D,Bathroom 72-1-1,45,
 Wednesday,D,Bathroom 72-1-2,45,
 Wednesday,D,Bathroom 127,45,
+Wednesday,D,Bathroom 134,45,
 Wednesday,D,Stairwell F,30,
 Wednesday,D,Entrance F,30,
 Friday,D,Room Office,120,
@@ -74,3 +78,14 @@ Thursday,D,Gym (Lower),60,
 Thursday,D,Gym (Upper),60,
 Thursday,B,Refill Baptistry,30,
 Any,D,Clean Tile Grout in 72 Building,60,https://form.jotform.com/250955404825056?space=Clean Tile Grout in 72 Building
+Any,D,Carpet Clean 72 Hallway,60,https://form.jotform.com/250955404825056?space=Carpet Clean 72 Hallway
+Any,B,Replace Bulbs in Fellowship Hallways,60,https://form.jotform.com/250955404825056?space=Replace Bulbs in Fellowship Hallways
+Any,D,Dust Gym HVAC Grilles,20,https://form.jotform.com/250955404825056?space=Dust Gym HVAC Grilles
+Friday,D,Vacuum Workshop Floor,20,https://form.jotform.com/250955404825056?space=Vacuum Workshop Floor
+Monday,B,Keep/Trash Burnisher Pads in Paper Goods Closet,30,https://form.jotform.com/250955404825056?space=Keep/Trash Burnisher Pads in Paper Goods Closet
+Monday,B,Empty Trash Cart Before Leaving-M,30,https://form.jotform.com/250955404825056?space=Empty Trash Cart Before Leaving-M
+Tuesday,D,Empty Trash Cart Before Leaving-T,30,https://form.jotform.com/250955404825056?space=Empty Trash Cart Before Leaving-T
+Wednesday,B,Empty Trash Cart Before Leaving-W,30,https://form.jotform.com/250955404825056?space=Empty Trash Cart Before Leaving-W
+Thursday,D,Empty Trash Cart Before Leaving-H,30,https://form.jotform.com/250955404825056?space=Empty Trash Cart Before Leaving-H
+Friday,B,Empty Trash Cart Before Leaving-F,30,https://form.jotform.com/250955404825056?space=Empty Trash Cart Before Leaving-F
+Any,A,Clean Baptistry,120,https://form.jotform.com/250955404825056?space=Clean Baptistry
