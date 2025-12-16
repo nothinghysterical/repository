@@ -33,69 +33,17 @@
 
     .pending { font-weight: bold; }
 
-    .no-pending {
-      text-align: center;
-      color: #666;
-      margin-top: 2rem;
-      font-style: italic;
-    }
-
-    .progress-bar {
-      width: 100%;
-      background-color: #e0e0e0;
-      border-radius: 10px;
-      overflow: hidden;
-      margin-bottom: 1rem;
-    }
-
-    .progress-fill {
-      height: 20px;
-      background-color: #4caf50;
-      width: 0%;
-      transition: width 0.5s;
-      text-align: center;
-      color: white;
-      line-height: 20px;
-    }
-
-    .refresh-button {
-      display: inline-block;
-      margin: 0 0.5rem 1rem 0;
-      padding: 0.5rem 1rem;
-      background-color: #007bff;
-      color: white;
-      border: none;
-      border-radius: 5px;
-      cursor: pointer;
-    }
-
-    .maintenance-button {
-      background-color: #28a745;
-    }
-
-    .schedule-name {
-      text-align: center;
-      margin-top: 2rem;
-      color: #666;
-    }
+    .no-pending { text-align: center; color: #666; margin-top: 2rem; font-style: italic; }
+    .progress-bar { width: 100%; background-color: #e0e0e0; border-radius: 10px; overflow: hidden; margin-bottom: 1rem; }
+    .progress-fill { height: 20px; background-color: #4caf50; width: 0%; transition: width 0.5s; text-align: center; color: white; line-height: 20px; }
+    .refresh-button { display: inline-block; margin: 0 auto 1rem; padding: 0.5rem 1rem; background-color: #007bff; color: white; border: none; border-radius: 5px; cursor: pointer; }
+    .schedule-name { text-align: center; margin-top: 2rem; color: #666; }
   </style>
 </head>
 <body>
-
   <h1>Pending Room Assignments</h1>
-
   <button class="refresh-button" onclick="location.reload()">Refresh</button>
-
-  <button
-    class="refresh-button maintenance-button"
-    onclick="window.open('https://thewocc.com/maintenance-request', '_blank')">
-    Maintenance Request
-  </button>
-
-  <div class="progress-bar">
-    <div id="progress" class="progress-fill">0%</div>
-  </div>
-
+  <div class="progress-bar"><div id="progress" class="progress-fill">0%</div></div>
   <div id="assignments"></div>
   <div class="schedule-name" id="scheduleName"></div>
 
@@ -150,7 +98,6 @@
     scheduleNameDiv.textContent = `Schedule: Colerain-Week${weekNumber}`;
 
     let scheduleText, tasksText;
-
     try {
       const scheduleResponse = await fetch(scheduleFilename);
       if (!scheduleResponse.ok) throw new Error(`File not found: ${scheduleFilename}`);
@@ -176,9 +123,7 @@
     const formId = '250955404825056';
     const roomFieldId = '18';
 
-    const submissionsData = await fetch(
-      `https://api.jotform.com/form/${formId}/submissions?apiKey=${apiKey}&limit=1000`
-    )
+    const submissionsData = await fetch(`https://api.jotform.com/form/${formId}/submissions?apiKey=${apiKey}&limit=1000`)
       .then(res => res.json())
       .then(json => json.content || []);
 
@@ -190,6 +135,7 @@
       const roomRaw = sub.answers?.[roomFieldId]?.answer?.trim() || '';
       const roomName = roomRaw.replace(/reset/i, '').trim();
       if (!roomName) continue;
+
       if (createdAt < monday || createdAt > sunday) continue;
 
       if (/reset/i.test(roomRaw)) {
@@ -198,7 +144,7 @@
         }
       } else {
         if (!validSubmissions[roomName] || createdAt > validSubmissions[roomName].date) {
-          validSubmissions[roomName] = { date: createdAt };
+          validSubmissions[roomName] = { date: createdAt, raw: roomRaw };
         }
       }
     }
@@ -211,16 +157,20 @@
       }
     }
 
-    const resetRooms = new Set(
-      Object.keys(resetTimes).filter(room => !statusMap[room])
-    );
+    const resetRooms = new Set();
+    for (const room in resetTimes) {
+      if (!statusMap[room]) {
+        resetRooms.add(room);
+      }
+    }
 
     const grouped = {};
-    const combinedTasks = [...scheduleData, ...tasksData];
 
     function getName(initial) {
       return housekeeperNames[initial] || initial;
     }
+
+    const combinedTasks = [...scheduleData, ...tasksData];
 
     for (const task of combinedTasks) {
       const day = task.Day || 'Any';
@@ -229,9 +179,9 @@
       const link = task.FormLink || task.Link || '';
       if (!hk || !room) continue;
 
-      grouped[hk] ??= {};
-      grouped[hk][day] ??= [];
-      grouped[hk][day].push({ room, link });
+      if (!grouped[hk]) grouped[hk] = {};
+      if (!grouped[hk][day]) grouped[hk][day] = [];
+      grouped[hk][day].push({ room: room, link: link });
     }
 
     let totalRooms = 0, completedRooms = 0;
@@ -244,10 +194,13 @@
       weekdayOrder.forEach(day => {
         const rooms = days[day] || [];
         hkTotal += rooms.length;
-        rooms.forEach(({ room }) => statusMap[room] && hkCompleted++);
+        rooms.forEach(({ room }) => {
+          if (statusMap[room]) hkCompleted++;
+        });
       });
 
-      html += `<h2>${hkName} (${hkTotal - hkCompleted} remaining)</h2>`;
+      const hkPending = hkTotal - hkCompleted;
+      html += `<h2>${hkName} (${hkPending} remaining)</h2>`;
 
       weekdayOrder.forEach(day => {
         const rooms = days[day] || [];
@@ -256,7 +209,8 @@
         html += `<h3>${day}</h3><ul>`;
         rooms.forEach(({ room, link }) => {
           totalRooms++;
-          let cls = 'pending', extra = '';
+          let extra = '';
+          let cls = '';
 
           if (statusMap[room]) {
             completedRooms++;
@@ -265,10 +219,12 @@
           } else if (resetRooms.has(room)) {
             cls = 'returned';
             extra = ' - Returned to Schedule';
+          } else {
+            cls = 'pending';
           }
 
           const roomDisplay = link
-            ? `<a href="${link}" target="_blank" rel="noopener">${room}</a>`
+            ? `<a href="${link}" target="_blank" rel="noopener noreferrer">${room}</a>`
             : room;
 
           html += `<li class="${cls}">${roomDisplay}${extra}</li>`;
@@ -277,15 +233,30 @@
       });
     });
 
-    assignmentsDiv.innerHTML = html || `<p class="no-pending">No assignments found.</p>`;
+    if (totalRooms === 0) {
+      assignmentsDiv.innerHTML = `<p class="no-pending">No assignments found.</p>`;
+      progressBar.style.width = '100%';
+      progressBar.textContent = '100%';
+      return;
+    }
 
-    const percent = totalRooms ? Math.round((completedRooms / totalRooms) * 100) : 100;
+    if (completedRooms === totalRooms) {
+      html += `<p class="no-pending">All rooms are completed this week!</p>`;
+    }
+
+    assignmentsDiv.innerHTML = html;
+
+    const percent = totalRooms > 0 ? Math.round((completedRooms / totalRooms) * 100) : 100;
     progressBar.style.width = percent + '%';
     progressBar.textContent = percent + '%';
   }
 
-  load();
-  setInterval(() => location.reload(), 300000);
+  load().catch(err => {
+    document.getElementById('assignments').innerHTML = `<p style="color:red;">Error loading assignments: ${err.message}</p>`;
+    console.error(err);
+  });
+
+  setInterval(() => location.reload(), 300000); // Refresh every 5 minutes
 </script>
 </body>
 </html>
