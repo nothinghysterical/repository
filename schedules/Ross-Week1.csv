@@ -1,22 +1,22 @@
-Day,Housekeeper,Room Name,Completion Time,Link,,
-Monday,D,Building Trash,30,https://form.jotform.com/250955404825056?space=Building Trash,,
-Monday,D,Bathroom 128-R,60,,,
-Monday,D,Bathroom 129-R,45,,,
-Monday,D,Bathroom 132-R,45,,,
-Monday,D,Bathroom 131-R,45,,,
-Monday,B,Hallway 102-R,90,,,
-Monday,D,Room 104-R,30,,480,8
-Monday,D,Room 105-R,30,,,
-Monday,D,Bathroom 106-R,45,,,
-Monday,D ,Room 107-R,30,,,
-Monday,D,Hallway 103-R,30,,,
-Monday,D,Room 110-R,30,,,
-Friday,B,Bathroom 108-R,45,,,
-Friday,B,Bathroom 109-R,45,,,
-Friday,B,Room 111-112-R,30,,,
-Friday,B,Kitchen 113-R,30,,,
-Friday,B,Bathroom 114-R,45,,,
-Friday,B,Bathroom 115-R,45,,,
-Friday,B,Room 117-R,30,,,
-Friday,B,Auditorium 119-R,120,,,
-Friday,B,Room 121-R,30,,,
+Day	Housekeeper	Room Name	Completion Time	Link
+Monday	C	Building Trash	30	https://form.jotform.com/250955404825056?space=Building Trash
+Monday	C	Bathroom 128-R	60	
+Monday	C	Bathroom 129-R	45	
+Monday	C	Bathroom 132-R	45	
+Monday	C	Bathroom 131-R	45	
+Monday	C	Hallway 102-R	90	
+Monday	C	Room 104-R	30	
+Monday	C	Room 105-R	30	
+Monday	C	Bathroom 106-R	45	
+Monday	C	Room 107-R	30	
+Monday	C	Hallway 103-R	30	
+Monday	C	Room 110-R	30	
+Monday	C	Bathroom 108-R	45	
+Monday	C	Bathroom 109-R	45	
+Monday	C	Room 111-112-R	30	
+Monday	C	Kitchen 113-R	30	
+Monday	C	Bathroom 114-R	45	
+Monday	C	Bathroom 115-R	45	
+Monday	C	Room 117-R	30	
+Monday	C	Auditorium 119-R	120	
+Monday	C	Room 121-R	30	
