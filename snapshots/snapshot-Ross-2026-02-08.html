@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="en"><head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Pending Room Assignments</title>
+  <style>
+    body { font-family: sans-serif; margin: 20px; }
+    h1 { text-align: center; margin-bottom: 1rem; }
+    h2 { margin-top: 2rem; margin-bottom: 0.5rem; }
+    h3 { margin-left: 1rem; margin-bottom: 0.25rem; color: #333; }
+    ul { margin-left: 2rem; margin-bottom: 1rem; list-style-type: none; padding-left: 1rem; }
+    li { margin-bottom: 0.25rem; }
+
+    .completed { color: green; }
+    .completed::before {
+      content: "✓ ";
+      color: green;
+      font-weight: bold;
+      margin-right: 0.25rem;
+    }
+
+    .returned {
+      color: orange;
+      font-weight: bold;
+    }
+    .returned::before {
+      content: "↺ ";
+      color: orange;
+      font-weight: bold;
+      margin-right: 0.25rem;
+    }
+
+    .pending { font-weight: bold; }
+
+    .no-pending {
+      text-align: center;
+      color: #666;
+      margin-top: 2rem;
+      font-style: italic;
+    }
+
+    .progress-bar {
+      width: 100%;
+      background-color: #e0e0e0;
+      border-radius: 10px;
+      overflow: hidden;
+      margin-bottom: 1rem;
+    }
+
+    .progress-fill {
+      height: 20px;
+      background-color: #4caf50;
+      width: 0%;
+      transition: width 0.5s;
+      text-align: center;
+      color: white;
+      line-height: 20px;
+    }
+
+    .refresh-button {
+      display: inline-block;
+      margin: 0 0.5rem 1rem 0;
+      padding: 0.5rem 1rem;
+      background-color: #007bff;
+      color: white;
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
+    }
+
+    .maintenance-button {
+      background-color: #28a745;
+    }
+
+    .schedule-name {
+      text-align: center;
+      margin-top: 2rem;
+      color: #666;
+    }
+  </style>
+</head>
+<body>
+
+  <h1>Pending Room Assignments</h1>
+
+  <button class="refresh-button" onclick="location.reload()">Refresh</button>
+
+  <button class="refresh-button maintenance-button" onclick="window.open('https://thewocc.com/maintenance-request', '_blank')">
+    Maintenance Request
+  </button>
+
+  <div class="progress-bar">
+    <div id="progress" class="progress-fill" style="width: 95%;">95%</div>
+  </div>
+
+  <div id="assignments"><h2>Lisa (1 remaining)</h2><h3>Any</h3><ul><li class="pending">Building Trash</li><li class="completed">Bathroom 128-R - 2/7/2026, 11:26:57 AM</li><li class="completed">Bathroom 129-R - 2/7/2026, 11:27:13 AM</li><li class="completed">Bathroom 132-R - 2/7/2026, 11:26:33 AM</li><li class="completed">Bathroom 131-R - 2/7/2026, 11:26:20 AM</li><li class="completed">Hallway 102-R - 2/7/2026, 12:57:24 PM</li><li class="completed">Room 104-R - 2/2/2026, 12:11:00 PM</li><li class="completed">Room 105-R - 2/5/2026, 11:22:46 AM</li><li class="completed">Bathroom 106-R - 2/2/2026, 12:17:27 PM</li><li class="completed">Room 107-R - 2/5/2026, 11:23:11 AM</li><li class="completed">Hallway 103-R - 2/5/2026, 12:27:41 PM</li><li class="completed">Room 110-R - 2/5/2026, 12:20:02 PM</li><li class="completed">Bathroom 108-R - 2/5/2026, 12:20:39 PM</li><li class="completed">Bathroom 109-R - 2/5/2026, 12:20:18 PM</li><li class="completed">Room 111-112-R - 2/6/2026, 9:15:49 AM</li><li class="completed">Kitchen 113-R - 2/6/2026, 10:53:31 AM</li><li class="completed">Bathroom 114-R - 2/6/2026, 10:27:44 AM</li><li class="completed">Bathroom 115-R - 2/6/2026, 10:27:54 AM</li><li class="completed">Room117-R - 2/6/2026, 10:27:33 AM</li><li class="completed">Auditorium-R - 2/6/2026, 11:11:11 AM</li><li class="completed">Room 121-R - 2/5/2026, 8:50:21 AM</li></ul></div>
+  <div class="schedule-name" id="scheduleName">Schedule: Ross-Week1</div>
+
+
+
+
+</body></html>
