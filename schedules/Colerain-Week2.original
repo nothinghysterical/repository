@@ -6,7 +6,6 @@ Monday,D,Room 320,30,
 Monday,D,Room 323,30,
 Monday,D,Room 326,30,
 Monday,D,Room 328,30,
-Monday,D,Room 330,20,
 Monday,D,Janitorial 72-3,20,
 Monday,D,Bathroom 72-3-1,45,
 Monday,D,Bathroom 72-3-2,45,
@@ -23,14 +22,15 @@ Tuesday,D,Bathroom Zone,45,
 Wednesday,D,Hallway 72-1,60,
 Wednesday,D,Room 124,30,
 Wednesday,D,Room 127,30,
-Wednesday,B,Room 128,30,
-Wednesday,B,Room 130,30,
-Wednesday,B,Bathroom 130,30,
-Wednesday,B,Room 134,30,
+Wednesday,D,Room 128,30,
+Wednesday,D,Room 130,30,
+Wednesday,D,Bathroom 130,30,
+Wednesday,D,Room 134,30,
 Wednesday,D,Janitorial 72-1,20,
 Wednesday,D,Bathroom 72-1-1,45,
 Wednesday,D,Bathroom 72-1-2,45,
 Wednesday,D,Bathroom 127,45,
+Wednesday,D,Bathroom 134,45,
 Wednesday,D,Stairwell F,30,
 Wednesday,D,Entrance F,30,
 Friday,D,Room Office,120,
@@ -50,6 +50,9 @@ Monday,B,Room 112,30,
 Monday,B,Room 111,30,
 Monday,B,Kitchen 92-1,60,
 Monday,B,Janitorial 92-1,20,
+Monday,B,Room 102,30,
+Monday,B,Room 103,30,
+Monday,B,Bathroom 102,45,
 Monday,B,Bathroom 92-1-1,45,
 Monday,B,Bathroom 92-1-2,45,
 Tuesday,B,Room 118,30,
@@ -75,14 +78,21 @@ Thursday,D,Bathroom 25-2-2,45,
 Thursday,D,Gym (Lower),60,
 Thursday,D,Gym (Upper),60,
 Thursday,B,Refill Baptistry,30,
-Any,B,Carpet Clean Lobby and Zone Hallway,120,https://form.jotform.com/250955404825056?space=Carpet Clean Lobby and Zone Hallway
-Any,D,Check Drain-Tame,15,https://form.jotform.com/250955404825056?space=Check Drain-Tame
-Any,B,Vacuum and Buff 72-3 Hallway,60,https://form.jotform.com/250955404825056?space=Vacuum and Buff 72-3 Hallway
-Any,B,Vacuum and Buff 72-1 Hallway,60,https://form.jotform.com/250955404825056?space=Vacuum and Buff 72-1 Hallway
+Any,D,Clean Tile Grout in 72 Building,60,https://form.jotform.com/250955404825056?space=Clean Tile Grout in 72 Building
+Friday,D,Vacuum Workshop Floor,20,https://form.jotform.com/250955404825056?space=Vacuum Workshop Floor
+Monday,B,Empty Trash Cart Before Leaving-M,30,https://form.jotform.com/250955404825056?space=Empty Trash Cart Before Leaving-M
+Tuesday,D,Empty Trash Cart Before Leaving-T,30,https://form.jotform.com/250955404825056?space=Empty Trash Cart Before Leaving-T
+Wednesday,B,Empty Trash Cart Before Leaving-W,30,https://form.jotform.com/250955404825056?space=Empty Trash Cart Before Leaving-W
+Thursday,D,Empty Trash Cart Before Leaving-H,30,https://form.jotform.com/250955404825056?space=Empty Trash Cart Before Leaving-H
+Friday,B,Empty Trash Cart Before Leaving-F,30,https://form.jotform.com/250955404825056?space=Empty Trash Cart Before Leaving-F
 Monday,B,Confirm that your schedule in is in the calendar-TC,0,https://form.jotform.com/250955404825056?space=Confirm that your schedule in is in the calendar-TC
 Monday,D,Confirm that your schedule in is in the calendar-GR,0,https://form.jotform.com/250955404825056?space=Confirm that your schedule in is in the calendar-GR
-Friday,D,Replace All Mop Heads,30,https://form.jotform.com/250955404825056?space=Replace All Mop Heads
+Any,D,Clean Blue Trash Bin,0,https://form.jotform.com/250955404825056?space=Clean Blue Trash Bin
+Any,D,Burn Weeds in Lot,0,https://form.jotform.com/250955404825056?space=Burn Weeds in Lot
+Any,B,Pull Weeds in F Garden,0,https://form.jotform.com/250955404825056?space=Pull Weeds in F Garden
+Any,B,Carpet Clean FH Table 3-4,0,https://form.jotform.com/250955404825056?space=Carpet Clean FH Table 3-4
 Monday,D,Entrance B to A Street Facing Windows,,https://form.jotform.com/250955404825056?space=Entrance B to A Street Facing Windows
 Monday,B,Entrance E-F Windows,,https://form.jotform.com/250955404825056?space=Entrance E-F Windows
 Tuesday,D,Entrance C & D Windows,,https://form.jotform.com/250955404825056?space=Entrance C & D Windows
 Tuesday,B,Entrance G to Cemetary-Side Windows,,https://form.jotform.com/250955404825056?space=Entrance G to Cemetary-Side Windows
+Thursday,D,Courtyard Windows,,https://form.jotform.com/250955404825056?space=Courtyard Windows
